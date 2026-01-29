@@ -1,4 +1,5 @@
 import React from 'react'
+import { useRouter } from 'expo-router'
 import {
   View,
   Text,
@@ -12,6 +13,7 @@ import {
 } from 'react-native'
 
 export default function Auth({ onSignIn }) {
+  const router = useRouter() // Move this INSIDE the component
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [staySigned, setStaySigned] = React.useState(false)
@@ -33,7 +35,7 @@ export default function Auth({ onSignIn }) {
     >
       <ScrollView contentContainerStyle={styles.container}>
         <Image
-          source={require('../../assets/icon.png')}
+          source={require('../../assets/seagle.png')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -45,7 +47,8 @@ export default function Auth({ onSignIn }) {
           <TextInput
             value={email}
             onChangeText={setEmail}
-            placeholder="Input"
+            placeholder="johndoe@email.com"
+            placeholderTextColor="#999999ce"
             keyboardType="email-address"
             autoCapitalize="none"
             style={styles.input}
@@ -57,7 +60,8 @@ export default function Auth({ onSignIn }) {
           <TextInput
             value={password}
             onChangeText={setPassword}
-            placeholder=""
+            placeholder="*********"
+            placeholderTextColor="#999999ce"
             secureTextEntry
             style={styles.input}
           />
@@ -86,7 +90,7 @@ export default function Auth({ onSignIn }) {
 
         <View style={styles.signUpRow}>
           <Text style={styles.noAccount}>Don't have an account?</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/SignUpScreen')}>
             <Text style={styles.signUpLink}> Sign Up</Text>
           </TouchableOpacity>
         </View>
@@ -98,7 +102,7 @@ export default function Auth({ onSignIn }) {
         </View>
 
         <TouchableOpacity style={styles.googleButton}>
-          <Image source={require('../../assets/favicon.png')} style={styles.googleIcon} />
+          <Image source={require('../../assets/google.png')} style={styles.googleIcon} />
           <Text style={styles.googleText}>Google</Text>
         </TouchableOpacity>
 
@@ -150,6 +154,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderRadius: 8,
+    fontStyle: '#ffffff9d',
     backgroundColor: '#fff',
     fontSize: 16,
   },
