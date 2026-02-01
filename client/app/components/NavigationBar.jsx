@@ -9,6 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import BookListing from './BookListing';
 
 const { width } = Dimensions.get('window');
 
@@ -63,10 +64,16 @@ const NavigationBar = () => {
     <View style={styles.container}>
       {/* Content Area */}
       <View style={styles.contentArea}>
-        <Text style={styles.contentTitle}>{tabs[activeTab].name}</Text>
-        <Text style={styles.contentDescription}>
-          {getContentDescription(activeTab)}
-        </Text>
+        {activeTab === 0 ? (
+          <BookListing />
+        ) : (
+          <>
+            <Text style={styles.contentTitle}>{tabs[activeTab].name}</Text>
+            <Text style={styles.contentDescription}>
+              {getContentDescription(activeTab)}
+            </Text>
+          </>
+        )}
       </View>
 
       {/* Navigation Bar */}
@@ -145,11 +152,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1A1F5C',
     marginBottom: 16,
+    fontFamily: 'FunnelSans',
   },
   contentDescription: {
     fontSize: 16,
     lineHeight: 24,
     color: '#4A5578',
+    fontFamily: 'FunnelSans',
   },
   navigationBar: {
     flexDirection: 'row',
@@ -185,6 +194,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#8B93C7',
     textAlign: 'center',
+    fontFamily: 'FunnelSans',
   },
   navLabelActive: {
     color: '#FFFFFF',

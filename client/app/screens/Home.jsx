@@ -1,14 +1,14 @@
 import React from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
-import NavigationBar from './NavigationBar'
+import NavigationBar from '../components/NavigationBar' 
+import TopHeader from '../components/TopHeader';
+
 
 export default function Home({ user, onSignOut }) {
   return (
     <View style={styles.container}>
+      <TopHeader/>
       <NavigationBar />
-      <TouchableOpacity style={styles.button} onPress={onSignOut}>
-        <Text style={styles.buttonText}>Sign out</Text>
-      </TouchableOpacity>
     </View>
   )
 }
