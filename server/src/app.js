@@ -1,0 +1,89 @@
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+require('dotenv').config();
+
+const app = express();
+
+// CORS configuration
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  credentials: true
+}));
+
+// Body parsing middleware
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// ========== STATIC FILES (legacy support for existing local files) ==========
+app.use('/static', express.static(path.join(__dirname, '../static'), {
+  setHeaders: (res, filepath) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    if (filepath.endsWith('.glb')) {
+      res.set('Content-Type', 'model/gltf-binary');
+    } else if (filepath.endsWith('.gltf')) {
+      res.set('Content-Type', 'model/gltf+json');
+    }
+  }
+}));
+
+app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+  setHeaders: (res, filepath) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    if (filepath.endsWith('.pdf')) {
+      res.set('Content-Type', 'application/pdf');
+    } else if (filepath.endsWith('.glb')) {
+      res.set('Content-Type', 'model/gltf-binary');
+    } else if (filepath.endsWith('.gltf')) {
+      res.set('Content-Type', 'model/gltf+json');
+    }
+  }
+}));
+
+// ========== API ROUTES ==========
+const authRoutes = require('./routes/auth.routes');
+const adminRoutes = require('./routes/admin.routes');
+
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ========== ERROR HANDLERS ==========
+// Multer / file upload errors
+app.use((err, req, res, next) => {
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ message: 'File too large. Maximum size is 100MB.' });
+  }
+  if (err.message && err.message.includes('File type not allowed')) {
+    return res.status(400).json({ message: err.message });
+  }
+  next(err);
+});
+
+// 404 handler
+app.use((req, res) => {
+  console.log('404 Not Found:', req.method, req.url);
+  res.status(404).json({
+    message: 'Route not found',
+    path: req.url,
+    method: req.method,
+  });
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  res.status(500).json({
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+module.exports = app;
