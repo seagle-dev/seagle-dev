@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,91 +6,60 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-
+import { fetchBooks, getBookCoverUrl } from '../../services/api';
 
 export default function BookListing() {
-      const [addedToCart, setAddedToCart] = useState({});
-      const router = useRouter();
+  const [addedToCart, setAddedToCart] = useState({});
+  const [recentBooks, setRecentBooks] = useState([]);
+  const [trendingBooks, setTrendingBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
-  const recentBooks = [
-    {
-      id: '1',
-      title: 'Medicine Book',
-      author: 'by Martini',
-      progress: 70,
-      chapter: 'Chapter 25: Liver',
-      image: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?w=200',
-      coverColor: '#4A90E2',
-    },
-    {
-      id: '2',
-      title: 'Dictionary of Medical Terms',
-      author: 'by Soh, Rothenberg, et al.',
-      progress: 10,
-      chapter: 'Chapter 5: Terms',
-      image: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=200',
-      coverColor: '#DC143C',
-    },
-  ];
+  useEffect(() => {
+    loadBooks();
+  }, []);
 
-  const trendingBooks = [
-    {
-      id: '3',
-      title: 'Internal Medicine',
-      author: 'by Robert M. Goldberg',
-      price: 69.99,
-      originalPrice: null,
-      image: 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=200',
-      rating: 4.5,
-      reviews: 234,
-    },
-    {
-      id: '4',
-      title: 'The Laws of Medicine',
-      author: 'by Siddhartha Mukherjee',
-      price: 49.99,
-      originalPrice: 59.99,
-      image: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=200',
-      rating: 4.8,
-      reviews: 567,
-    },
-    {
-      id: '5',
-      title: 'Human Anatomy Atlas',
-      author: 'by Henry Gray',
-      price: 89.99,
-      originalPrice: null,
-      image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=200',
-      rating: 4.7,
-      reviews: 892,
-    },
-  ];
+  const loadBooks = async () => {
+    try {
+      const [newestRes, trendingRes] = await Promise.all([
+        fetchBooks({ sort: 'newest', limit: 5 }),
+        fetchBooks({ sort: 'trending', limit: 5 }),
+      ]);
+      setRecentBooks(newestRes.data || []);
+      setTrendingBooks(trendingRes.data || []);
+    } catch (err) {
+      console.error('Failed to load books:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleBookPress = (book) => {
-      const normalizedBook = {
-        id: book.id,
-        title: book.title,
-        author: book.author,
-        image: book.image,
-        isOwned: book.progress !== undefined,
-        ...(book.progress !== undefined
-          ? { progress: book.progress, currentChapter: book.chapter }
-          : {
-              price: book.price,
-              originalPrice: book.originalPrice,
-              rating: book.rating,
-              reviews: book.reviews,
-            }),
-      };
+  const getImageUri = (book) => {
+    if (book.coverImage) return getBookCoverUrl(book.id);
+    return 'https://images.unsplash.com/photo-1532012197267-da84d127e765?w=200';
+  };
 
-      router.push({
-        pathname: '/tabs/book/BookDetails',
-        params: { book: JSON.stringify(normalizedBook) },
-      });
+  const handleBookPress = (book) => {
+    const normalizedBook = {
+      id: book.id,
+      title: book.title,
+      author: book.uploadedBy || '',
+      image: getImageUri(book),
+      description: book.description,
+      category: book.category,
+      isOwned: false,
+      readCount: book.readCount || 0,
     };
+
+    router.push({
+      pathname: '/tabs/book/BookDetails',
+      params: { book: JSON.stringify(normalizedBook) },
+    });
+  };
 
   const handleAddToCart = (book) => {
     console.log('Add to cart:', book.title);
@@ -120,9 +89,17 @@ export default function BookListing() {
     return stars;
   };
 
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#111A50" />
+      </View>
+    );
+  }
+
   return (
-    <ScrollView 
-      style={styles.container} 
+    <ScrollView
+      style={styles.container}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.scrollContent}
     >
@@ -144,11 +121,11 @@ export default function BookListing() {
               activeOpacity={0.95}
             >
               <View style={styles.recentCardContent}>
-                {/* Book Cover - ENLARGED */}
+                {/* Book Cover */}
                 <View style={styles.bookCoverContainer}>
                   <View style={[styles.bookCoverBg]}>
-                    <Image 
-                      source={{ uri: book.image }} 
+                    <Image
+                      source={{ uri: getImageUri(book) }}
                       style={styles.bookCover}
                       resizeMode="cover"
                     />
@@ -161,41 +138,21 @@ export default function BookListing() {
                     {book.title}
                   </Text>
                   <Text style={styles.bookAuthor} numberOfLines={1}>
-                    {book.author}
+                    {book.category || ''}
                   </Text>
-                  
-                  {/* Progress Section */}
-                  <View style={styles.progressSection}>
-                    <View style={styles.progressContainer}>
-                      <View style={styles.progressBar}>
-                        <View 
-                          style={[
-                            styles.progressFill, 
-                            { 
-                              width: `${book.progress}%`,
-                              backgroundColor: book.progress > 50 ? '#111A50' : '#111A50',
-                            }
-                          ]} 
-                        />
-                      </View>
-                      <Text style={[
-                        styles.progressText,
-                        { color: book.progress > 50 ? '#111A50' : '#111A50' }
-                      ]}>
-                        {book.progress}%
-                      </Text>
-                    </View>
 
-                    <View style={styles.chapterContainer}>
-                      <Ionicons name="book-outline" size={12} color="#999" />
-                      <Text style={styles.chapterText}>{book.chapter}</Text>
-                    </View>
+                  {/* Read count indicator */}
+                  <View style={styles.chapterContainer}>
+                    <Ionicons name="book-outline" size={12} color="#999" />
+                    <Text style={styles.chapterText}>
+                      {book.readCount || 0} reads
+                    </Text>
                   </View>
                 </View>
 
-                {/* Arrow Button - INLINE WITH IMAGE */}
+                {/* Arrow Button */}
                 <View style={styles.arrowButtonContainer}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.arrowButton}
                     onPress={() => handleBookPress(book)}
                   >
@@ -225,10 +182,10 @@ export default function BookListing() {
                 onPress={() => handleBookPress(book)}
                 activeOpacity={0.95}
               >
-                {/* Book Cover - ENLARGED */}
+                {/* Book Cover */}
                 <View style={styles.trendingCoverContainer}>
-                  <Image 
-                    source={{ uri: book.image }} 
+                  <Image
+                    source={{ uri: getImageUri(book) }}
                     style={styles.trendingCover}
                     resizeMode="cover"
                   />
@@ -241,19 +198,19 @@ export default function BookListing() {
                       {book.title}
                     </Text>
                     <Text style={styles.trendingBookAuthor} numberOfLines={1}>
-                      {book.author}
+                      {book.category || ''}
                     </Text>
 
-                    {/* Price Badge - DEDICATED CONTAINER */}
+                    {/* Reads Badge */}
                     <View style={styles.priceBadge}>
-                      <Text style={styles.priceLabel}>Php</Text>
-                      <Text style={styles.priceText}>{book.price.toFixed(0)}</Text>
+                      <Ionicons name="trending-up" size={12} color="#111A50" />
+                      <Text style={styles.priceText}> {book.readCount || 0} reads</Text>
                     </View>
                   </View>
                 </View>
               </TouchableOpacity>
 
-              {/* Add to Cart Button - MOVED TO BOTTOM RIGHT, REDUCED WIDTH */}
+              {/* Add to Cart Button */}
               <View style={styles.addToCartContainer}>
                 <TouchableOpacity
                   style={[
@@ -264,10 +221,10 @@ export default function BookListing() {
                   activeOpacity={0.8}
                   disabled={addedToCart[book.id]}
                 >
-                  <Ionicons 
-                    name={addedToCart[book.id] ? "checkmark-circle" : "cart-outline"} 
-                    size={18} 
-                    color={addedToCart[book.id] ? "#111A50" : "#111A50"} 
+                  <Ionicons
+                    name={addedToCart[book.id] ? "checkmark-circle" : "cart-outline"}
+                    size={18}
+                    color="#111A50"
                   />
                   <Text style={[
                     styles.addToCartText,

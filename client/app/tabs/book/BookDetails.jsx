@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
-  StatusBar,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -194,7 +193,7 @@ export default function BookDetails() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Category</Text>
           <View style={styles.categoryChips}>
-            {(book.categories || ['Medicine', 'Anatomy']).map((category, index) => (
+            {(book.categories || (book.category ? [book.category] : ['General'])).map((category, index) => (
               <View key={`${category}-${index}`} style={styles.categoryChip}>
                 <Text style={styles.categoryChipText}>{category}</Text>
               </View>

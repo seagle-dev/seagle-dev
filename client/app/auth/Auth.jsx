@@ -1,4 +1,4 @@
-import React from 'react'
+import { useState } from 'react'
 import { useRouter } from 'expo-router'
 import {
   View,
@@ -10,21 +10,33 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native'
+import { useAuth } from '../../context/AuthContext'
 
-export default function Auth({ onSignIn }) {
-  const router = useRouter() // Move this INSIDE the component
-  const [email, setEmail] = React.useState('')
-  const [password, setPassword] = React.useState('')
-  const [staySigned, setStaySigned] = React.useState(false)
+export default function Auth() {
+  const router = useRouter()
+  const { login } = useAuth()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [staySigned, setStaySigned] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const handleSignIn = async () => {
-    const user = { id: Date.now().toString(), name: email || 'User', email }
-    const token = 'local-token-' + Date.now()
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter email and password.')
+      return
+    }
+    setLoading(true)
     try {
-      await onSignIn(user, token)
-    } catch {
-      onSignIn(user, token)
+      await login(email.trim(), password)
+      router.replace('/tabs')
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Login failed'
+      Alert.alert('Login Failed', msg)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -52,6 +64,7 @@ export default function Auth({ onSignIn }) {
             keyboardType="email-address"
             autoCapitalize="none"
             style={styles.input}
+            editable={!loading}
           />
         </View>
 
@@ -64,6 +77,7 @@ export default function Auth({ onSignIn }) {
             placeholderTextColor="#999999ce"
             secureTextEntry
             style={styles.input}
+            editable={!loading}
           />
         </View>
 
@@ -84,13 +98,22 @@ export default function Auth({ onSignIn }) {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.loginButton} onPress={handleSignIn} activeOpacity={0.9}>
-          <Text style={styles.loginText}>Log In</Text>
+        <TouchableOpacity
+          style={[styles.loginButton, loading && { opacity: 0.7 }]}
+          onPress={handleSignIn}
+          activeOpacity={0.9}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.loginText}>Log In</Text>
+          )}
         </TouchableOpacity>
 
         <View style={styles.signUpRow}>
           <Text style={styles.noAccount}>Don't have an account?</Text>
-          <TouchableOpacity onPress={() => router.push('/SignUpScreen')}>
+          <TouchableOpacity onPress={() => router.push('/screens/SignUpScreen')}>
             <Text style={styles.signUpLink}> Sign Up</Text>
           </TouchableOpacity>
         </View>

@@ -5,9 +5,11 @@ require('dotenv').config();
 
 const app = express();
 
-// CORS configuration
+// CORS configuration – allow web admin + Expo dev client
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+    : ['http://localhost:5173', 'http://localhost:8081'],
   credentials: true
 }));
 
@@ -46,9 +48,13 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
 // ========== API ROUTES ==========
 const authRoutes = require('./routes/auth.routes');
 const adminRoutes = require('./routes/admin.routes');
+const homeRoutes = require('./routes/home.routes');
+const libraryRoutes = require('./routes/library.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/home', homeRoutes);
+app.use('/api/library', libraryRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

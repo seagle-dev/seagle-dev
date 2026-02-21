@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'expo-router'
 import {
   View,
@@ -13,10 +13,13 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native'
+import { useAuth } from '../../context/AuthContext'
 
 export default function SignUpScreen() {
   const router = useRouter()
+  const { register } = useAuth()
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -26,15 +29,25 @@ export default function SignUpScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleCreateAccount = () => {
-    // Add validation here if needed
+  const handleCreateAccount = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter email and password.')
+      return
+    }
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match.')
+      return
+    }
     setIsLoading(true)
-    
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      await register(email.trim(), password)
       setIsLoading(false)
       router.push('/screens/SuccessScreen')
-    }, 2000)
+    } catch (err) {
+      setIsLoading(false)
+      const msg = err.response?.data?.message || err.message || 'Registration failed'
+      Alert.alert('Registration Failed', msg)
+    }
   }
 
   const navigateToLogin = () => {
