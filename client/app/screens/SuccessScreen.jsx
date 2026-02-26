@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native'
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../constants/theme'
 
 export default function SuccessScreen() {
   const router = useRouter()
@@ -56,76 +57,16 @@ export default function SuccessScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  successIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 10,
-    backgroundColor: '#8DD3FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  checkmark: {
-    fontSize: 48,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111A50',
-    marginBottom: 12,
-    fontFamily: 'FunnelSans-Bold',
-  },
-  successMessage: {
-    fontSize: 16,
-    color: '#111A50',
-    textAlign: 'center',
-    marginBottom: 32,
-    fontFamily: 'FunnelSans-Regular',
-    lineHeight: 24,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'center',
-    width: '100%',
-  },
-  button: {
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 26,
-    alignItems: 'center',
-    minWidth: 120,
-  },
-  backButton: {
-    backgroundColor: '#111A50',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  backButtonText: {
-    color: '#FF8C42',
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'FunnelSans-Regular',
-  },
-  continueButton: {
-    backgroundColor: '#FF8C42',
-  },
-  continueButtonText: {
-    color: '#111A50',
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'FunnelSans-Regular',
-  },
+  container: { flex: 1, backgroundColor: COLORS.bgWhite },
+  content: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: SPACING.xxl },
+  successIcon: { width: 80, height: 80, borderRadius: RADIUS.md, backgroundColor: '#8DD3FA', justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.xxl },
+  checkmark: { fontSize: 48, color: COLORS.white, fontWeight: 'bold' },
+  successTitle: { fontSize: FONT_SIZES.title, fontWeight: '700', color: COLORS.navy, marginBottom: SPACING.md, fontFamily: FONTS.bold },
+  successMessage: { fontSize: FONT_SIZES.lg, color: COLORS.navy, textAlign: 'center', marginBottom: SPACING.xxxl, fontFamily: FONTS.regular, lineHeight: 24 },
+  buttonContainer: { flexDirection: 'row', gap: SPACING.md, justifyContent: 'center', width: '100%' },
+  button: { paddingVertical: 14, paddingHorizontal: 28, borderRadius: RADIUS.pill, alignItems: 'center', minWidth: 120 },
+  backButton: { backgroundColor: COLORS.navy, borderWidth: 1, borderColor: COLORS.borderLight },
+  backButtonText: { color: COLORS.orange, fontSize: FONT_SIZES.body, fontWeight: '600', fontFamily: FONTS.regular },
+  continueButton: { backgroundColor: COLORS.orange },
+  continueButtonText: { color: COLORS.navy, fontSize: FONT_SIZES.body, fontWeight: '600', fontFamily: FONTS.regular },
 })

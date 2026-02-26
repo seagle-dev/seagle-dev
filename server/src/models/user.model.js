@@ -1,28 +1,28 @@
 const db = require('../config/db');
 
 module.exports = {
-  createUser: (email, password_hash, cb) => {
+  createUser: async (email, password_hash) => {
     const defaultRole = 'learner';
-    db.query(
+    const [result] = await db.execute(
       "INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)",
-      [email, password_hash, defaultRole],
-      cb
+      [email, password_hash, defaultRole]
     );
+    return result;
   },
 
-  findById: (id, cb) => {
-    db.query(
+  findById: async (id) => {
+    const [rows] = await db.execute(
       "SELECT id, email FROM users WHERE id = ?",
-      [id],
-      cb
+      [id]
     );
+    return rows;
   },
 
-  findByEmail: (email, cb) => {
-    db.query(
+  findByEmail: async (email) => {
+    const [rows] = await db.execute(
       "SELECT * FROM users WHERE email = ?",
-      [email],
-      cb
+      [email]
     );
+    return rows;
   }
 };

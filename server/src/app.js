@@ -7,7 +7,11 @@ const app = express();
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: [
+    process.env.CORS_ORIGIN || 'http://localhost:5173',
+    'http://localhost:8081',   // Expo web
+    'http://localhost:19006',  // Expo web alt
+  ],
   credentials: true
 }));
 
@@ -46,9 +50,14 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
 // ========== API ROUTES ==========
 const authRoutes = require('./routes/auth.routes');
 const adminRoutes = require('./routes/admin.routes');
+const libraryRoutes = require('./routes/library.routes');
+const homeRoutes = require('./routes/home.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/library', libraryRoutes);
+app.use('/api/home', homeRoutes);
+
 
 // Health check
 app.get('/api/health', (req, res) => {

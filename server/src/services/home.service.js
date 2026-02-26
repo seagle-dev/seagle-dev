@@ -1,6 +1,4 @@
 const db = require('../config/db');
-const util = require('util');
-const query = util.promisify(db.query).bind(db);
 
 async function getRecentlyRead(userId) {
   const sql = `
@@ -11,7 +9,7 @@ async function getRecentlyRead(userId) {
     ORDER BY uba.last_read_at DESC
     LIMIT 5
   `;
-  const rows = await query(sql, [userId]);
+  const [rows] = await db.execute(sql, [userId]);
   return rows.map(r => ({
     id: r.id,
     title: r.title,
@@ -32,7 +30,7 @@ async function getTrending() {
     ORDER BY read_count DESC
     LIMIT 5
   `;
-  const rows = await query(sql);
+  const [rows] = await db.execute(sql);
   return rows.map(r => ({
     id: r.id,
     title: r.title,

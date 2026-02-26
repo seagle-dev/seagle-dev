@@ -7,42 +7,47 @@ const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 
 exports.register = async (req, res) => {
   const { email, password } = req.body;
+  console.log('Register called with email:', email);
   if (!email || !password) return res.status(400).json({ message: "Email and password required" });
 
   try {
     const hash = await bcrypt.hash(password, 10);
+    console.log('Password hashed successfully');
 
     let firebaseUser = null;
     try {
       firebaseUser = await admin.auth().createUser({ email, password });
+      console.log('Firebase user created:', firebaseUser.uid);
     } catch (fbErr) {
+      console.log('Firebase error:', fbErr.code, fbErr.message);
       if (fbErr.code !== 'auth/email-already-exists') {
         return res.status(500).json({ message: "Firebase error", error: fbErr.message });
       }
     }
 
-    // keep default role in DB to satisfy schema
     const defaultRole = 'learner';
 
-    db.query(
-      "INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)",
-      [email, hash, defaultRole],
-      async (err, result) => {
-        if (err) {
-          if (firebaseUser && firebaseUser.uid) {
-            try { await admin.auth().deleteUser(firebaseUser.uid); } catch (_) {}
-          }
-          if (err.code === "ER_DUP_ENTRY") return res.status(400).json({ message: "User already exists" });
-          return res.status(500).json({ message: "DB error", error: err.message });
-        }
+    try {
+      const [result] = await db.execute(
+        "INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)",
+        [email, hash, defaultRole]
+      );
+      console.log('DB insert result:', result.insertId);
 
-        const userId = result.insertId;
-        const token = jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
+      const userId = result.insertId;
+      const token = jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
 
-        return res.status(201).json({ token, user: { id: userId, email } });
+      return res.status(201).json({ token, user: { id: userId, email } });
+    } catch (dbErr) {
+      console.error('DB error:', dbErr.code, dbErr.message);
+      if (firebaseUser && firebaseUser.uid) {
+        try { await admin.auth().deleteUser(firebaseUser.uid); } catch (_) {}
       }
-    );
+      if (dbErr.code === "ER_DUP_ENTRY") return res.status(400).json({ message: "User already exists" });
+      return res.status(500).json({ message: "DB error", error: dbErr.message });
+    }
   } catch (err) {
+    console.error('Register top-level error:', err);
     return res.status(500).json({ message: "Server error", error: err.message });
   }
 };
@@ -51,34 +56,27 @@ exports.login = async (req, res) => {
   const { email, password, idToken } = req.body;
 
   if (idToken) {
-    if (!idToken) return res.status(400).json({ message: "idToken required" });
     try {
       const decoded = await admin.auth().verifyIdToken(idToken);
       const fEmail = decoded.email;
       if (!fEmail) return res.status(400).json({ message: "Firebase token has no email" });
 
-      return db.query("SELECT * FROM users WHERE email = ?", [fEmail], (err, results) => {
-        if (err) return res.status(500).json({ message: "DB error", error: err.message });
+      const [results] = await db.execute("SELECT * FROM users WHERE email = ?", [fEmail]);
+      const defaultRole = 'learner';
 
-        const defaultRole = 'learner';
+      if (results && results.length > 0) {
+        const user = results[0];
+        const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
+        return res.json({ token, user: { id: user.id, email: user.email } });
+      }
 
-        if (results && results.length > 0) {
-          const user = results[0];
-          const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
-          return res.json({ token, user: { id: user.id, email: user.email } });
-        }
-
-        db.query(
-          "INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)",
-          [fEmail, '', defaultRole],
-          (insertErr, insertRes) => {
-            if (insertErr) return res.status(500).json({ message: "DB error", error: insertErr.message });
-            const newId = insertRes.insertId;
-            const token = jwt.sign({ id: newId }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
-            return res.json({ token, user: { id: newId, email: fEmail } });
-          }
-        );
-      });
+      const [insertRes] = await db.execute(
+        "INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)",
+        [fEmail, '', defaultRole]
+      );
+      const newId = insertRes.insertId;
+      const token = jwt.sign({ id: newId }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
+      return res.json({ token, user: { id: newId, email: fEmail } });
     } catch (err) {
       return res.status(401).json({ message: "Invalid Firebase token", error: err.message });
     }
@@ -86,23 +84,21 @@ exports.login = async (req, res) => {
 
   if (!email || !password) return res.status(400).json({ message: "Email and password required" });
 
-  db.query("SELECT * FROM users WHERE email = ?", [email], async (err, results) => {
-    if (err) return res.status(500).json({ message: "DB error", error: err.message });
+  try {
+    const [results] = await db.execute("SELECT * FROM users WHERE email = ?", [email]);
     if (!results || results.length === 0) return res.status(401).json({ message: "Invalid credentials" });
 
     const user = results[0];
-    try {
-      if (!user.password_hash) return res.status(401).json({ message: "Account uses Firebase authentication. Sign in with Firebase." });
+    if (!user.password_hash) return res.status(401).json({ message: "Account uses Firebase authentication. Sign in with Firebase." });
 
-      const isMatch = await bcrypt.compare(password, user.password_hash);
-      if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
-      const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
-      res.json({ token, user: { id: user.id, email: user.email } });
-    } catch (err) {
-      res.status(500).json({ message: "Server error", error: err.message });
-    }
-  });
+    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
+    return res.json({ token, user: { id: user.id, email: user.email } });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error", error: err.message });
+  }
 };
 
 exports.firebaseAuth = async (req, res) => {
@@ -116,32 +112,26 @@ exports.firebaseAuth = async (req, res) => {
 
     const defaultRole = 'learner';
 
-    db.query("SELECT * FROM users WHERE email = ?", [email], (err, results) => {
-      if (err) return res.status(500).json({ message: "DB error", error: err.message });
+    const [results] = await db.execute("SELECT * FROM users WHERE email = ?", [email]);
 
-      if (results && results.length > 0) {
-        const user = results[0];
-        const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
-        return res.json({ token, user: { id: user.id, email: user.email } });
-      }
+    if (results && results.length > 0) {
+      const user = results[0];
+      const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
+      return res.json({ token, user: { id: user.id, email: user.email } });
+    }
 
-      db.query(
-        "INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)",
-        [email, '', defaultRole],
-        (insertErr, insertRes) => {
-          if (insertErr) return res.status(500).json({ message: "DB error", error: insertErr.message });
-          const newId = insertRes.insertId;
-          const token = jwt.sign({ id: newId }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
-          return res.json({ token, user: { id: newId, email } });
-        }
-      );
-    });
+    const [insertRes] = await db.execute(
+      "INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)",
+      [email, '', defaultRole]
+    );
+    const newId = insertRes.insertId;
+    const token = jwt.sign({ id: newId }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
+    return res.json({ token, user: { id: newId, email } });
   } catch (err) {
     return res.status(401).json({ message: "Invalid Firebase token", error: err.message });
   }
 };
 
-// Development convenience: return or create an admin user and issue JWT
 exports.autoLogin = async (req, res) => {
   try {
     const devEmail = process.env.AUTO_LOGIN_EMAIL;
@@ -189,8 +179,7 @@ exports.refreshToken = (req, res) => {
   const token = authHeader.slice(7);
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET); // Verify the current token
-    // Issue a new token with extended expiration
+    const decoded = jwt.verify(token, JWT_SECRET);
     const newToken = jwt.sign({ id: decoded.id }, JWT_SECRET, { expiresIn: '24h' });
     res.json({ token: newToken });
   } catch (err) {

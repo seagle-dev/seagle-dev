@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
-  StatusBar,
+  Share,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
+import Badge from '../../components/Badge';
 
 export default function BookDetails() {
   const router = useRouter();
@@ -38,6 +40,14 @@ export default function BookDetails() {
     router.push('/tabs');
   };
 
+  const handleShare = async () => {
+    try {
+      await Share.share({ message: `Check out "${book.title}" on Seagle!` });
+    } catch (e) {
+      console.log('Share error:', e);
+    }
+  };
+
   const handleStartReading = () => {
     router.push({
       pathname: '/tabs/Reader',
@@ -56,161 +66,173 @@ export default function BookDetails() {
     setTimeout(() => setAddedToCart(false), 2000);
   };
 
+  const isFreeLibraryBook = !!book.pdfUrl && (!book.price || book.price === 0);
+
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
 
-        {/* Book Card */}
-        <View style={styles.bookCard}>
+        {/* Single continuous card */}
+        <View style={styles.card}>
 
           {/* Back Button */}
-          <View style={styles.cardHeader}>
-            <TouchableOpacity style={styles.cardBackButton} onPress={handleBack} activeOpacity={0.7}>
-              <Ionicons name="chevron-back" size={18} color="#111A50" />
-              <Text style={styles.cardBackText}>Back</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
+            <Ionicons name="chevron-back" size={20} color="#111A50" />
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
 
-          {/* Cover + Info Row */}
-          <View style={styles.bookCardContent}>
-            <View style={styles.coverContainer}>
+          {/* ===== TOP ROW: Cover + Info ===== */}
+          <View style={styles.topRow}>
+            {/* Cover with border */}
+            <View style={styles.coverWrapper}>
               <Image source={{ uri: book.image }} style={styles.bookCover} resizeMode="cover" />
             </View>
 
-            <View style={styles.bookInfo}>
-              <Text style={styles.bookTitle} numberOfLines={3}>
-                {book.title}
-              </Text>
-              <Text style={styles.bookAuthor} numberOfLines={2}>
-                {book.author}
-              </Text>
+            {/* Right side info */}
+            <View style={styles.infoColumn}>
+              {/* Title + Share icon row */}
+              <View style={styles.titleRow}>
+                <Text style={styles.bookTitle} numberOfLines={3}>{book.title}</Text>
+                <TouchableOpacity onPress={handleShare} style={styles.shareButton} activeOpacity={0.7}>
+                  <Ionicons name="share-social-outline" size={20} color="#111A50" />
+                </TouchableOpacity>
+              </View>
 
+              <Text style={styles.bookAuthor} numberOfLines={2}>{book.author}</Text>
+
+              {/* Badge */}
               {book.isOwned ? (
-                <>
-                  <View style={styles.ownedBadge}>
-                    <Ionicons name="checkmark-circle" size={16} color="#111A50" />
-                    <Text style={styles.ownedText}>Owned</Text>
-                  </View>
-                  <View style={styles.chapterContainer}>
-                    <Ionicons name="book-outline" size={14} color="#666" />
-                    <Text style={styles.chapterText}>{book.currentChapter ?? ''}</Text>
-                  </View>
-                </>
+                <View style={styles.ownedBadge}>
+                  <Text style={styles.ownedBadgeText}>Owned</Text>
+                </View>
+              ) : isFreeLibraryBook ? (
+                <View style={styles.libraryBadge}>
+                  <Text style={styles.libraryBadgeText}>Free</Text>
+                </View>
               ) : (
-                <View style={styles.priceContainer}>
-                  {book.originalPrice ? (
-                    <Text style={styles.originalPrice}>
-                      Php {Number(book.originalPrice).toFixed(0)}
-                    </Text>
-                  ) : null}
-                  <View style={styles.priceBadge}>
-                    <Text style={styles.priceLabel}>Php</Text>
-                    <Text style={styles.priceText}>{Number(book.price).toFixed(0)}</Text>
-                  </View>
+                <View style={styles.priceBadge}>
+                  <Text style={styles.priceBadgeText}>Php {Number(book.price || 0).toFixed(0)}</Text>
                 </View>
               )}
+
+              {/* Description snippet next to cover */}
+              <Text style={styles.snippetText} numberOfLines={4}>
+                {book.description ||
+                  'Lorem ipsum dolor sit amet consectetur adipiscing eli mattis sit phasellus mollis sit aliquam sit nullam.'}
+              </Text>
             </View>
           </View>
 
-          {/* Owned vs Not Owned */}
+          {/* ===== ACTIONS ===== */}
           {book.isOwned ? (
-            <View style={styles.ownedRow}>
-              {/* Left: Progress */}
-              <View style={styles.progressColumn}>
-                <View style={styles.progressContainer}>
-                  <View style={styles.progressBar}>
-                    <View style={[styles.progressFill, { width: `${book.progress ?? 0}%` }]} />
-                  </View>
-                  <Text style={styles.progressText}>{book.progress ?? 0}%</Text>
+            /* OWNED: Progress bar + Start Reading */
+            <View style={styles.ownedActions}>
+              <View style={styles.progressRow}>
+                <View style={styles.progressDot} />
+                <View style={styles.progressBarContainer}>
+                  <View style={[styles.progressBarFill, { width: `${book.progress ?? 0}%` }]} />
                 </View>
-              </View>
+                <Text style={styles.progressPercent}>{book.progress ?? 0}%</Text>
 
-              {/* Right: Start Reading */}
+                <TouchableOpacity
+                  style={styles.startReadingButton}
+                  onPress={handleStartReading}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="book-outline" size={16} color="#fff" />
+                  <Text style={styles.startReadingText}>Start Reading</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : isFreeLibraryBook ? (
+            <View style={styles.actionSection}>
+              <View style={styles.divider} />
               <TouchableOpacity
-                style={styles.startReadingButtonInline}
+                style={styles.startReadingButtonFull}
                 onPress={handleStartReading}
                 activeOpacity={0.8}
               >
                 <Ionicons name="book-outline" size={18} color="#fff" />
-                <Text style={styles.startReadingText}>Start Reading</Text>
+                <Text style={styles.startReadingTextFull}>Start Reading</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.actionButtons}>
-              {/* Buy Now */}
-              <TouchableOpacity style={styles.actionCol} onPress={handleBuyNow} activeOpacity={0.8}>
-                <View style={styles.actionBtnPrimary}>
-                  <Ionicons name="cart" size={14} color="#fff" />
-                  <Text style={styles.actionBtnPrimaryText}>Buy Now</Text>
-                </View>
-              </TouchableOpacity>
+            /* NOT OWNED: Divider + Buy Now, Add to Likes, Add to Cart */
+            <View style={styles.actionSection}>
+              <View style={styles.divider} />
+              <View style={styles.purchaseActions}>
+                <TouchableOpacity
+                  style={styles.buyNowButton}
+                  onPress={handleBuyNow}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.buyNowText}>Buy Now</Text>
+                </TouchableOpacity>
 
-              {/* Add to Likes */}
-              <TouchableOpacity style={styles.actionCol} onPress={handleAddToLikes} activeOpacity={0.8}>
-                <View style={[styles.actionBtnSecondary, isLiked && styles.actionBtnLiked]}>
+                <TouchableOpacity
+                  style={[styles.outlineButton, isLiked && styles.outlineButtonLiked]}
+                  onPress={handleAddToLikes}
+                  activeOpacity={0.8}
+                >
                   <Ionicons
                     name={isLiked ? 'heart' : 'heart-outline'}
                     size={14}
                     color={isLiked ? '#FF4444' : '#111A50'}
                   />
-                  <Text style={[styles.actionBtnSecondaryText, isLiked && { color: '#FF4444' }]}>
+                  <Text style={[styles.outlineButtonText, isLiked && { color: '#FF4444' }]}>
                     Add to Likes
                   </Text>
-                </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
 
-              {/* Add to Cart */}
-              <TouchableOpacity
-                style={styles.actionCol}
-                onPress={handleAddToCart}
-                activeOpacity={0.8}
-                disabled={addedToCart}
-              >
-                <View style={[styles.actionBtnSecondary, addedToCart && styles.actionBtnAdded]}>
+                <TouchableOpacity
+                  style={[styles.outlineButton, addedToCart && styles.outlineButtonAdded]}
+                  onPress={handleAddToCart}
+                  activeOpacity={0.8}
+                  disabled={addedToCart}
+                >
                   <Ionicons
                     name={addedToCart ? 'checkmark-circle' : 'cart-outline'}
                     size={14}
                     color="#111A50"
                   />
-                  <Text style={styles.actionBtnSecondaryText}>
+                  <Text style={styles.outlineButtonText}>
                     {addedToCart ? 'Added!' : 'Add to Cart'}
                   </Text>
-                </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
-        </View>
 
-        {/* Description Section */}
-        <View style={styles.section}>
+          {/* ===== DESCRIPTION SECTION ===== */}
+          <View style={styles.sectionDivider} />
           <Text style={styles.sectionTitle}>Description</Text>
           <Text style={styles.descriptionText}>
             {book.description ||
-              'Explore the comprehensive guide to human anatomy with detailed illustrations and expert insights.'}
+              'Anatomy 101 provides a clear and engaging introduction to the human body, covering everything from the chemical composition of cells to the complex functions of organ systems. With easy-to-follow explanations, detailed charts, and illustrations, this book simplifies anatomy without leaving out essential details. It\'s designed for students, educators, or anyone curious about how the body works, making even the most complex systems understandable.'}
           </Text>
-        </View>
 
-        {/* Category Section */}
-        <View style={styles.section}>
+          {/* ===== CATEGORY SECTION ===== */}
+          <View style={styles.sectionDivider} />
           <Text style={styles.sectionTitle}>Category</Text>
-          <View style={styles.categoryChips}>
-            {(book.categories || ['Medicine', 'Anatomy']).map((category, index) => (
-              <View key={`${category}-${index}`} style={styles.categoryChip}>
-                <Text style={styles.categoryChipText}>{category}</Text>
+          <View style={styles.categoryRow}>
+            {(book.categories || ['Medicine', 'Anatomy']).map((cat, index) => (
+              <View key={`${cat}-${index}`} style={styles.categoryChip}>
+                <Text style={styles.categoryChipText}>{cat}</Text>
               </View>
             ))}
           </View>
-        </View>
 
-        {/* About the Author */}
-        <View style={styles.section}>
+          {/* ===== ABOUT THE AUTHOR ===== */}
+          <View style={styles.sectionDivider} />
           <Text style={styles.sectionTitle}>About the Author</Text>
-          <View style={styles.authorContainer}>
+          <View style={styles.authorRow}>
             <View style={styles.authorAvatar}>
-              <Ionicons name="person" size={24} color="#111A50" />
+              <Ionicons name="person" size={24} color="#fff" />
             </View>
             <Text style={styles.authorName}>{book.author}</Text>
           </View>
+
+          <View style={styles.cardBottomSpacing} />
         </View>
 
         <View style={styles.bottomSpacing} />
@@ -220,205 +242,76 @@ export default function BookDetails() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: COLORS.bgPrimary },
   scrollView: { flex: 1 },
 
   errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  errorText: { fontSize: 16, color: '#666', fontFamily: 'FunnelSans-Regular' },
+  errorText: { fontSize: FONT_SIZES.lg, color: COLORS.textSecondary, fontFamily: FONTS.regular },
 
-  bookCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  bookCardContent: { flexDirection: 'row', marginBottom: 16 },
-  coverContainer: { marginRight: 20 },
-  bookCover: { width: 120, height: 180, borderRadius: 12 },
-
-  bookInfo: { flex: 1, justifyContent: 'flex-start' },
-  bookTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 6,
-    lineHeight: 26,
-    fontFamily: 'STIXTwoText-Bold',
-  },
-  bookAuthor: { fontSize: 14, color: '#666', marginBottom: 12, fontFamily: 'FunnelSans-Regular' },
-
-  ownedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#e8f5e9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#111A50',
-  },
-  ownedText: { fontSize: 13, fontWeight: '600', color: '#111A50', marginLeft: 4, fontFamily: 'FunnelSans-Regular' },
-
-  priceContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  originalPrice: { fontSize: 14, color: '#999', textDecorationLine: 'line-through', fontFamily: 'FunnelSans-Regular' },
-  priceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FCECDD',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#FF8C42',
-  },
-  priceLabel: { fontSize: 13, fontWeight: '600', color: '#111A50', marginRight: 4, fontFamily: 'FunnelSans-Regular' },
-  priceText: { fontSize: 14, fontWeight: '800', color: '#111A50', fontFamily: 'FunnelSans-Regular' },
-
-  progressSection: { marginBottom: 16, gap: 8 },
-  progressContainer: { flexDirection: 'row', alignItems: 'center' },
-  progressBar: {
-    flex: 1,
-    height: 10,
-    backgroundColor: '#e8f5e9',
-    borderRadius: 5,
-    overflow: 'hidden',
-    marginRight: 12,
-  },
-  progressFill: { height: '100%', backgroundColor: '#111A50', borderRadius: 5 },
-  progressText: { fontSize: 14, fontWeight: '700', color: '#111A50', width: 45, fontFamily: 'FunnelSans-Regular' },
-
-  chapterContainer: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-  chapterText: { fontSize: 13, color: '#666', fontFamily: 'FunnelSans-Light' },
-
-  actionButtons: { flexDirection: 'row', gap: 8, marginTop: 4 },
-
-  actionCol: {
-    width: 112,
-    alignItems: 'center',
+  card: {
+    backgroundColor: COLORS.bgWhite,
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.lg,
+    borderRadius: RADIUS.xl,
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.xl,
+    ...SHADOWS.small,
   },
 
-  actionBtnPrimary: {
-    width: 112,
-    height: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FF8C42',
-    borderRadius: 12,
-    gap: 4,
-  },
-  actionBtnPrimaryText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-    fontFamily: 'FunnelSans-Regular',
-  },
+  backButton: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.xl, gap: SPACING.xs },
+  backText: { fontSize: FONT_SIZES.regular, fontWeight: '600', color: COLORS.navy, fontFamily: FONTS.regular },
 
-  actionBtnSecondary: {
-    width: 112,
-    height: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#111A50',
-    gap: 4,
-  },
-  actionBtnSecondaryText: {
-    color: '#111A50',
-    fontSize: 11,
-    fontWeight: '600',
-    fontFamily: 'FunnelSans-Regular',
-  },
-  actionBtnLiked: {
-    borderColor: '#FF4444',
-    backgroundColor: '#fff5f5',
-  },
-  actionBtnAdded: {
-    borderColor: '#111A50',
-    backgroundColor: '#f1f8f4',
-  },
+  topRow: { flexDirection: 'row', marginBottom: SPACING.lg },
+  coverWrapper: { width: 120, height: 175, borderRadius: RADIUS.md, borderWidth: 2, borderColor: COLORS.orange, overflow: 'hidden', marginRight: SPACING.lg },
+  bookCover: { width: '100%', height: '100%' },
 
-  startReadingText: { color: '#fff', fontSize: 15, fontWeight: '600', fontFamily: 'FunnelSans-Regular' },
+  infoColumn: { flex: 1, paddingTop: 2 },
+  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  bookTitle: { flex: 1, fontSize: FONT_SIZES.xxl, fontWeight: '700', color: COLORS.textPrimary, lineHeight: 26, marginBottom: 2, marginRight: SPACING.sm, fontFamily: FONTS.serifBold },
+  shareButton: { padding: SPACING.xs, marginTop: 2 },
+  bookAuthor: { fontSize: FONT_SIZES.body, color: COLORS.textSecondary, marginBottom: SPACING.md, fontFamily: FONTS.regular },
 
-  section: { backgroundColor: '#fff', marginHorizontal: 16, marginTop: 16, borderRadius: 20, padding: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a', marginBottom: 12, fontFamily: 'STIXTwoText-Bold' },
-  descriptionText: { fontSize: 14, color: '#666', lineHeight: 22, fontFamily: 'FunnelSans-Light' },
+  priceBadge: { borderWidth: 1.5, borderColor: COLORS.navy, paddingHorizontal: 14, paddingVertical: 5, borderRadius: RADIUS.xl, alignSelf: 'flex-start', marginBottom: SPACING.md },
+  priceBadgeText: { fontSize: 13, fontWeight: '700', color: COLORS.navy, fontFamily: FONTS.regular },
+  ownedBadge: { backgroundColor: COLORS.orangeBg, paddingHorizontal: 14, paddingVertical: 5, borderRadius: RADIUS.xl, alignSelf: 'flex-start', borderWidth: 1.5, borderColor: COLORS.orange, marginBottom: SPACING.md },
+  ownedBadgeText: { fontSize: 13, fontWeight: '700', color: COLORS.orange, fontFamily: FONTS.regular },
+  libraryBadge: { backgroundColor: COLORS.bgLight, paddingHorizontal: 14, paddingVertical: 5, borderRadius: RADIUS.xl, alignSelf: 'flex-start', borderWidth: 1.5, borderColor: COLORS.navy, marginBottom: SPACING.md },
+  libraryBadgeText: { fontSize: 13, fontWeight: '700', color: COLORS.navy, fontFamily: FONTS.regular },
+  snippetText: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, lineHeight: 18, fontFamily: FONTS.light },
 
-  categoryChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  categoryChip: {
-    backgroundColor: '#f0f4ff',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#111A50',
-  },
-  categoryChipText: { fontSize: 13, color: '#111A50', fontWeight: '600', fontFamily: 'FunnelSans-Regular' },
+  actionSection: { marginTop: SPACING.xs },
+  divider: { height: 1, backgroundColor: COLORS.border, marginBottom: SPACING.lg },
+  purchaseActions: { flexDirection: 'row', gap: SPACING.sm, flexWrap: 'wrap', marginBottom: SPACING.sm },
+  buyNowButton: { backgroundColor: COLORS.orange, paddingHorizontal: 22, paddingVertical: 10, borderRadius: RADIUS.xl },
+  buyNowText: { fontSize: 13, fontWeight: '700', color: COLORS.white, fontFamily: FONTS.regular },
+  outlineButton: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: COLORS.navy, paddingHorizontal: SPACING.md, paddingVertical: 9, borderRadius: RADIUS.xl, gap: 5 },
+  outlineButtonText: { fontSize: FONT_SIZES.md, fontWeight: '600', color: COLORS.navy, fontFamily: FONTS.regular },
+  outlineButtonLiked: { borderColor: COLORS.red, backgroundColor: '#fff5f5' },
+  outlineButtonAdded: { borderColor: COLORS.navy, backgroundColor: '#f1f8f4' },
 
-  authorContainer: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  authorAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#f0f4ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  authorName: { fontSize: 16, color: '#1a1a1a', fontWeight: '600', fontFamily: 'FunnelSans-Regular' },
+  ownedActions: { marginTop: SPACING.xs, marginBottom: SPACING.sm },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  progressDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.navy },
+  progressBarContainer: { flex: 1, height: 8, backgroundColor: COLORS.border, borderRadius: RADIUS.sm, overflow: 'hidden' },
+  progressBarFill: { height: '100%', backgroundColor: COLORS.navy, borderRadius: RADIUS.sm },
+  progressPercent: { fontSize: 13, fontWeight: '700', color: COLORS.navy, minWidth: 32, fontFamily: FONTS.regular },
+  startReadingButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.orange, paddingHorizontal: 14, paddingVertical: 10, borderRadius: RADIUS.xl, gap: 6 },
+  startReadingText: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.white, fontFamily: FONTS.regular },
+  startReadingButtonFull: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.orange, paddingVertical: 14, borderRadius: RADIUS.pill, gap: SPACING.sm, marginBottom: SPACING.sm },
+  startReadingTextFull: { color: COLORS.white, fontSize: FONT_SIZES.regular, fontWeight: '700', fontFamily: FONTS.regular },
 
+  sectionDivider: { height: 1, backgroundColor: COLORS.border, marginVertical: SPACING.xl },
+  sectionTitle: { fontSize: FONT_SIZES.xl, fontWeight: '700', color: COLORS.navy, marginBottom: SPACING.md, fontFamily: FONTS.serifBold },
+  descriptionText: { fontSize: FONT_SIZES.body, color: '#444', lineHeight: 22, fontFamily: FONTS.light },
+
+  categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md },
+  categoryChip: { backgroundColor: COLORS.orange, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.sm, borderRadius: RADIUS.xl },
+  categoryChipText: { fontSize: 13, color: COLORS.white, fontWeight: '600', fontFamily: FONTS.regular },
+
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+  authorAvatar: { width: 48, height: 48, borderRadius: RADIUS.pill, backgroundColor: COLORS.navy, justifyContent: 'center', alignItems: 'center' },
+  authorName: { fontSize: FONT_SIZES.lg, color: COLORS.textPrimary, fontWeight: '600', fontFamily: FONTS.regular },
+
+  cardBottomSpacing: { height: SPACING.xxl },
   bottomSpacing: { height: 30 },
-
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    marginBottom: 12,
-  },
-
-  cardBackButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    gap: 6,
-  },
-
-  cardBackText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111A50',
-    fontFamily: 'FunnelSans-Light',
-  },
-
-  ownedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    gap: 12,
-  },
-
-  progressColumn: {
-    flex: 1,
-  },
-
-  startReadingButtonInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#111A50',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 24,
-    gap: 6,
-  },
 });

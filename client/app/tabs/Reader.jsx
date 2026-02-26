@@ -1,5 +1,4 @@
-// app/screens/Reader.jsx
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,7 +6,6 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Modal,
   Dimensions,
@@ -16,6 +14,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import TopHeader from '../components/TopHeader';
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../constants/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -33,46 +32,45 @@ export default function Reader() {
     'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800',
   ];
 
-  const handleImagePress = (imageUri) => {
+  const handleImagePress = useCallback((imageUri) => {
     setSelectedImage(imageUri);
     setScale(1);
     setRotation(0);
-  };
+  }, []);
 
-  const closeViewer = () => {
+  const closeViewer = useCallback(() => {
     setSelectedImage(null);
     setScale(1);
     setRotation(0);
-  };
+  }, []);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setScale(1);
     setRotation(0);
-  };
+  }, []);
 
-  const handleZoomIn = () => {
+  const handleZoomIn = useCallback(() => {
     setScale(prev => Math.min(prev + 0.5, 4));
-  };
+  }, []);
 
-  const handleZoomOut = () => {
+  const handleZoomOut = useCallback(() => {
     setScale(prev => Math.max(prev - 0.5, 1));
-  };
+  }, []);
 
-  const handleRotate = () => {
+  const handleRotate = useCallback(() => {
     setRotation(prev => (prev + 90) % 360);
-  };
+  }, []);
 
-    const handleBackPress = () => {
-      if (typeof router.canGoBack === 'function' && router.canGoBack()) {
-        router.back();
-        return;
-      }
-
-      router.replace({
-        pathname: '/tabs/book/BookDetails',
-        params: { book: JSON.stringify(book) },
-      });
-    };
+  const handleBackPress = useCallback(() => {
+    if (typeof router.canGoBack === 'function' && router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace({
+      pathname: '/tabs/book/BookDetails',
+      params: { book: JSON.stringify(book) },
+    });
+  }, [router, book]);
 
 
   if (!book) {
@@ -81,8 +79,8 @@ export default function Reader() {
         <TopHeader 
           showBackButton={true}
           onBackPress={() => router.back()}
-          backgroundColor="#fef9f3"
-          textColor="#1a2647"
+          backgroundColor={COLORS.bgPrimary}
+          textColor={COLORS.navyDeep}
         />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Book not found</Text>
@@ -98,8 +96,8 @@ export default function Reader() {
         showBackButton={true}
         onBackPress={handleBackPress}
         title={book.title}
-        backgroundColor="#fef9f3"
-        textColor="#1a2647"
+        backgroundColor={COLORS.bgPrimary}
+        textColor={COLORS.navyDeep}
         showCart={false}
         showNotifications={false}
         showProfile={false}
@@ -131,7 +129,7 @@ export default function Reader() {
               resizeMode="cover"
             />
             <View style={styles.imageCaption}>
-              <Ionicons name="expand-outline" size={16} color="#666" />
+              <Ionicons name="expand-outline" size={16} color={COLORS.textLight} />
               <Text style={styles.imageCaptionText}>Tap to view full size</Text>
             </View>
           </TouchableOpacity>
@@ -247,7 +245,7 @@ export default function Reader() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fef9f3',
+    backgroundColor: COLORS.bgPrimary,
   },
   scrollView: {
     flex: 1,
@@ -258,26 +256,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorText: {
-    fontSize: 16,
-    color: '#666',
-    fontFamily: 'FunnelSans-Regular',
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textLight,
+    fontFamily: FONTS.regular,
   },
   content: {
-    padding: 20,
+    padding: SPACING.xl,
   },
   paragraph: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.md,
     lineHeight: 26,
-    color: '#333',
-    marginBottom: 16,
-    fontFamily: 'FunnelSans-Light',
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
+    fontFamily: FONTS.light,
     textAlign: 'justify',
   },
   imageCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 12,
-    marginVertical: 16,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.sm,
+    marginVertical: SPACING.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -287,28 +285,28 @@ const styles = StyleSheet.create({
   contentImage: {
     width: '100%',
     height: 250,
-    borderRadius: 12,
+    borderRadius: RADIUS.lg,
   },
   imageCaption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    marginTop: SPACING.xs,
     gap: 6,
   },
   imageCaptionText: {
-    fontSize: 13,
-    color: '#666',
-    fontFamily: 'FunnelSans-Light',
+    fontSize: FONT_SIZES.xs + 3,
+    color: COLORS.textLight,
+    fontFamily: FONTS.light,
   },
   floatingButton: {
     position: 'absolute',
     bottom: 30,
-    right: 20,
+    right: SPACING.xl,
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#111A50',
+    backgroundColor: COLORS.navy,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -324,7 +322,7 @@ const styles = StyleSheet.create({
   closeButton: {
     position: 'absolute',
     top: 50,
-    right: 20,
+    right: SPACING.xl,
     zIndex: 10,
     width: 44,
     height: 44,
@@ -350,17 +348,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingVertical: 20,
+    paddingVertical: SPACING.xl,
     paddingBottom: Platform.OS === 'web' ? 20 : 40,
   },
   toolButton: {
     alignItems: 'center',
-    gap: 4,
+    gap: SPACING.xs,
   },
   toolButtonText: {
-    color: '#fff',
+    color: COLORS.white,
     fontSize: 11,
-    fontFamily: 'FunnelSans-Light',
+    fontFamily: FONTS.light,
   },
   bottomSpacing: {
     height: 40,

@@ -1,15 +1,12 @@
-import React from 'react'
-import {
-  View,
-  Text,
-  StyleSheet,
-} from 'react-native'
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { COLORS, FONTS, FONT_SIZES, SPACING } from '../constants/theme';
 
 const STAGES = [
   { label: 'Role', step: 1 },
   { label: 'Account', step: 2 },
   { label: 'Details', step: 3 },
-]
+];
 
 export default function SignUpProgressBar({ currentStep = 1 }) {
   return (
@@ -17,7 +14,6 @@ export default function SignUpProgressBar({ currentStep = 1 }) {
       <View style={styles.progressBar}>
         {STAGES.map((stage, index) => (
           <View key={stage.step} style={styles.stageWrapper}>
-            {/* Circle indicator */}
             <View
               style={[
                 styles.circle,
@@ -34,7 +30,6 @@ export default function SignUpProgressBar({ currentStep = 1 }) {
               </Text>
             </View>
 
-            {/* Connecting line (not on last stage) */}
             {index < STAGES.length - 1 && (
               <View
                 style={[
@@ -47,7 +42,6 @@ export default function SignUpProgressBar({ currentStep = 1 }) {
         ))}
       </View>
 
-      {/* Stage labels */}
       <View style={styles.labelsContainer}>
         {STAGES.map((stage) => (
           <Text
@@ -62,20 +56,20 @@ export default function SignUpProgressBar({ currentStep = 1 }) {
         ))}
       </View>
     </View>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 24,
-    paddingHorizontal: 24,
-    backgroundColor: '#fff',
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    backgroundColor: COLORS.white,
   },
   progressBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: SPACING.md,
   },
   stageWrapper: {
     flex: 1,
@@ -86,46 +80,47 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: COLORS.border,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 2,
   },
   circleActive: {
-    backgroundColor: '#f97316',
+    backgroundColor: COLORS.orange,
   },
   stepNumber: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.md,
     fontWeight: '600',
-    color: '#9ca3af',
+    color: COLORS.textMuted,
+    fontFamily: FONTS.regular,
   },
   stepNumberActive: {
-    color: '#fff',
+    color: COLORS.white,
   },
   line: {
     flex: 1,
     height: 2,
-    backgroundColor: '#e5e7eb',
-    marginHorizontal: 4,
-    marginTop: 20,
+    backgroundColor: COLORS.border,
+    marginHorizontal: SPACING.xs,
+    marginTop: SPACING.xl,
   },
   lineActive: {
-    backgroundColor: '#f97316',
+    backgroundColor: COLORS.orange,
   },
   labelsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   label: {
-    fontSize: 12,
-    color: '#9ca3af',
-    fontWeight: '500',            
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+    fontFamily: FONTS.regular,
     flex: 1,
     textAlign: 'center',
   },
   labelActive: {
-    color: '#f97316',
+    color: COLORS.orange,
     fontWeight: '600',
   },
-})
-
+});
