@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,9 @@ import {
   TouchableOpacity,
   Share,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
-import Badge from '../../components/Badge';
 
 export default function BookDetails() {
   const router = useRouter();
@@ -21,42 +20,49 @@ export default function BookDetails() {
 
   const [isLiked, setIsLiked] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
+  // NEW: local "owned" state — defaults to book.isOwned from params
+  const [isOwned, setIsOwned] = useState(book?.isOwned ?? false);
 
   if (!book) {
     return (
-      <View style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Book not found</Text>
-        </View>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Book not found</Text>
       </View>
     );
   }
 
   const handleBack = () => {
-    if (typeof router.canGoBack === 'function' && router.canGoBack()) {
+    if (router.canGoBack?.()) {
       router.back();
-      return;
+    } else {
+      router.replace('/tabs/library');
     }
-    router.push('/tabs');
   };
 
   const handleShare = async () => {
     try {
       await Share.share({ message: `Check out "${book.title}" on Seagle!` });
-    } catch (e) {
-      console.log('Share error:', e);
+    } catch (err) {
+      console.warn('Share error:', err);
     }
   };
 
   const handleStartReading = () => {
     router.push({
       pathname: '/tabs/Reader',
-      params: { book: JSON.stringify(book) },
+      params: {
+        book: JSON.stringify({
+          id: book.id,
+          title: book.title,
+          pdfUrl: book.pdfUrl,
+        }),
+      },
     });
   };
 
+  // NEW: "Buy Now" just flips the local owned state
   const handleBuyNow = () => {
-    console.log('Buy Now clicked for:', book.title);
+    setIsOwned(true);
   };
 
   const handleAddToLikes = () => setIsLiked((prev) => !prev);
@@ -71,102 +77,78 @@ export default function BookDetails() {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-
-        {/* Single continuous card */}
         <View style={styles.card}>
-
           {/* Back Button */}
-          <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color="#111A50" />
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+            <Ionicons name="chevron-back" size={22} color={COLORS.navy} />
             <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
 
-          {/* ===== TOP ROW: Cover + Info ===== */}
+          {/* Top Row: Cover + Info */}
           <View style={styles.topRow}>
-            {/* Cover with border */}
             <View style={styles.coverWrapper}>
               <Image source={{ uri: book.image }} style={styles.bookCover} resizeMode="cover" />
             </View>
 
-            {/* Right side info */}
             <View style={styles.infoColumn}>
-              {/* Title + Share icon row */}
               <View style={styles.titleRow}>
-                <Text style={styles.bookTitle} numberOfLines={3}>{book.title}</Text>
-                <TouchableOpacity onPress={handleShare} style={styles.shareButton} activeOpacity={0.7}>
-                  <Ionicons name="share-social-outline" size={20} color="#111A50" />
+                <Text style={styles.bookTitle}>{book.title}</Text>
+                <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+                  <Ionicons name="share-outline" size={22} color={COLORS.navy} />
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.bookAuthor} numberOfLines={2}>{book.author}</Text>
+              <Text style={styles.bookAuthor}>{book.author || 'Unknown Author'}</Text>
 
-              {/* Badge */}
-              {book.isOwned ? (
+              {/* Price / Owned / Free Badge */}
+              {isOwned ? (
                 <View style={styles.ownedBadge}>
-                  <Text style={styles.ownedBadgeText}>Owned</Text>
+                  <Text style={styles.ownedBadgeText}>✓ Owned</Text>
                 </View>
               ) : isFreeLibraryBook ? (
                 <View style={styles.libraryBadge}>
-                  <Text style={styles.libraryBadgeText}>Free</Text>
+                  <Text style={styles.libraryBadgeText}>📚 Free Library Book</Text>
                 </View>
               ) : (
                 <View style={styles.priceBadge}>
-                  <Text style={styles.priceBadgeText}>Php {Number(book.price || 0).toFixed(0)}</Text>
+                  <Text style={styles.priceBadgeText}>Php {book.price || 0}</Text>
                 </View>
               )}
 
-              {/* Description snippet next to cover */}
-              <Text style={styles.snippetText} numberOfLines={4}>
-                {book.description ||
-                  'Lorem ipsum dolor sit amet consectetur adipiscing eli mattis sit phasellus mollis sit aliquam sit nullam.'}
+              <Text style={styles.snippetText} numberOfLines={3}>
+                {book.description || 'No description available.'}
               </Text>
             </View>
           </View>
 
-          {/* ===== ACTIONS ===== */}
-          {book.isOwned ? (
-            /* OWNED: Progress bar + Start Reading */
-            <View style={styles.ownedActions}>
-              <View style={styles.progressRow}>
-                <View style={styles.progressDot} />
-                <View style={styles.progressBarContainer}>
-                  <View style={[styles.progressBarFill, { width: `${book.progress ?? 0}%` }]} />
-                </View>
-                <Text style={styles.progressPercent}>{book.progress ?? 0}%</Text>
+          {/* Action Section */}
+          <View style={styles.actionSection}>
+            <View style={styles.divider} />
 
-                <TouchableOpacity
-                  style={styles.startReadingButton}
-                  onPress={handleStartReading}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="book-outline" size={16} color="#fff" />
-                  <Text style={styles.startReadingText}>Start Reading</Text>
+            {isOwned || isFreeLibraryBook ? (
+              /* ---------- OWNED / FREE: Show reading controls ---------- */
+              <View style={styles.ownedActions}>
+                <TouchableOpacity style={styles.startReadingButtonFull} onPress={handleStartReading} activeOpacity={0.8}>
+                  <Ionicons name="book" size={20} color={COLORS.white} />
+                  <Text style={styles.startReadingTextFull}>
+                    {isOwned ? 'Continue Reading' : 'Start Reading'}
+                  </Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          ) : isFreeLibraryBook ? (
-            <View style={styles.actionSection}>
-              <View style={styles.divider} />
-              <TouchableOpacity
-                style={styles.startReadingButtonFull}
-                onPress={handleStartReading}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="book-outline" size={18} color="#fff" />
-                <Text style={styles.startReadingTextFull}>Start Reading</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            /* NOT OWNED: Divider + Buy Now, Add to Likes, Add to Cart */
-            <View style={styles.actionSection}>
-              <View style={styles.divider} />
+            ) : (
+              /* ---------- NOT OWNED: Show purchase controls ---------- */
               <View style={styles.purchaseActions}>
+                <TouchableOpacity style={styles.buyNowButton} onPress={handleBuyNow} activeOpacity={0.8}>
+                  <Text style={styles.buyNowText}>Buy Now</Text>
+                </TouchableOpacity>
+
                 <TouchableOpacity
-                  style={styles.buyNowButton}
-                  onPress={handleBuyNow}
+                  style={[styles.outlineButton, addedToCart && styles.outlineButtonAdded]}
+                  onPress={handleAddToCart}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.buyNowText}>Buy Now</Text>
+                  <Ionicons name={addedToCart ? 'checkmark-circle' : 'cart-outline'} size={16} color={COLORS.navy} />
+                  <Text style={styles.outlineButtonText}>{addedToCart ? 'Added!' : 'Add to Cart'}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -174,62 +156,45 @@ export default function BookDetails() {
                   onPress={handleAddToLikes}
                   activeOpacity={0.8}
                 >
-                  <Ionicons
-                    name={isLiked ? 'heart' : 'heart-outline'}
-                    size={14}
-                    color={isLiked ? '#FF4444' : '#111A50'}
-                  />
-                  <Text style={[styles.outlineButtonText, isLiked && { color: '#FF4444' }]}>
-                    Add to Likes
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.outlineButton, addedToCart && styles.outlineButtonAdded]}
-                  onPress={handleAddToCart}
-                  activeOpacity={0.8}
-                  disabled={addedToCart}
-                >
-                  <Ionicons
-                    name={addedToCart ? 'checkmark-circle' : 'cart-outline'}
-                    size={14}
-                    color="#111A50"
-                  />
-                  <Text style={styles.outlineButtonText}>
-                    {addedToCart ? 'Added!' : 'Add to Cart'}
+                  <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={16} color={isLiked ? COLORS.red : COLORS.navy} />
+                  <Text style={[styles.outlineButtonText, isLiked && { color: COLORS.red }]}>
+                    {isLiked ? 'Liked' : 'Add to Likes'}
                   </Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          )}
+            )}
+          </View>
 
-          {/* ===== DESCRIPTION SECTION ===== */}
+          {/* Description Section */}
           <View style={styles.sectionDivider} />
           <Text style={styles.sectionTitle}>Description</Text>
           <Text style={styles.descriptionText}>
-            {book.description ||
-              'Anatomy 101 provides a clear and engaging introduction to the human body, covering everything from the chemical composition of cells to the complex functions of organ systems. With easy-to-follow explanations, detailed charts, and illustrations, this book simplifies anatomy without leaving out essential details. It\'s designed for students, educators, or anyone curious about how the body works, making even the most complex systems understandable.'}
+            {book.description || 'No description available for this book.'}
           </Text>
 
-          {/* ===== CATEGORY SECTION ===== */}
-          <View style={styles.sectionDivider} />
-          <Text style={styles.sectionTitle}>Category</Text>
-          <View style={styles.categoryRow}>
-            {(book.categories || ['Medicine', 'Anatomy']).map((cat, index) => (
-              <View key={`${cat}-${index}`} style={styles.categoryChip}>
-                <Text style={styles.categoryChipText}>{cat}</Text>
+          {/* Categories */}
+          {book.categories?.length > 0 && (
+            <>
+              <View style={styles.sectionDivider} />
+              <Text style={styles.sectionTitle}>Categories</Text>
+              <View style={styles.categoryRow}>
+                {book.categories.map((cat, idx) => (
+                  <View key={idx} style={styles.categoryChip}>
+                    <Text style={styles.categoryChipText}>{cat}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
+            </>
+          )}
 
-          {/* ===== ABOUT THE AUTHOR ===== */}
+          {/* Author Section */}
           <View style={styles.sectionDivider} />
-          <Text style={styles.sectionTitle}>About the Author</Text>
+          <Text style={styles.sectionTitle}>Author</Text>
           <View style={styles.authorRow}>
             <View style={styles.authorAvatar}>
-              <Ionicons name="person" size={24} color="#fff" />
+              <Ionicons name="person" size={24} color={COLORS.white} />
             </View>
-            <Text style={styles.authorName}>{book.author}</Text>
+            <Text style={styles.authorName}>{book.author || 'Unknown Author'}</Text>
           </View>
 
           <View style={styles.cardBottomSpacing} />
@@ -275,7 +240,7 @@ const styles = StyleSheet.create({
   priceBadgeText: { fontSize: 13, fontWeight: '700', color: COLORS.navy, fontFamily: FONTS.regular },
   ownedBadge: { backgroundColor: COLORS.orangeBg, paddingHorizontal: 14, paddingVertical: 5, borderRadius: RADIUS.xl, alignSelf: 'flex-start', borderWidth: 1.5, borderColor: COLORS.orange, marginBottom: SPACING.md },
   ownedBadgeText: { fontSize: 13, fontWeight: '700', color: COLORS.orange, fontFamily: FONTS.regular },
-  libraryBadge: { backgroundColor: COLORS.bgLight, paddingHorizontal: 14, paddingVertical: 5, borderRadius: RADIUS.xl, alignSelf: 'flex-start', borderWidth: 1.5, borderColor: COLORS.navy, marginBottom: SPACING.md },
+  libraryBadge: { backgroundColor: '#f0f4ff', paddingHorizontal: 14, paddingVertical: 5, borderRadius: RADIUS.xl, alignSelf: 'flex-start', borderWidth: 1.5, borderColor: COLORS.navy, marginBottom: SPACING.md },
   libraryBadgeText: { fontSize: 13, fontWeight: '700', color: COLORS.navy, fontFamily: FONTS.regular },
   snippetText: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, lineHeight: 18, fontFamily: FONTS.light },
 
@@ -290,13 +255,6 @@ const styles = StyleSheet.create({
   outlineButtonAdded: { borderColor: COLORS.navy, backgroundColor: '#f1f8f4' },
 
   ownedActions: { marginTop: SPACING.xs, marginBottom: SPACING.sm },
-  progressRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  progressDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.navy },
-  progressBarContainer: { flex: 1, height: 8, backgroundColor: COLORS.border, borderRadius: RADIUS.sm, overflow: 'hidden' },
-  progressBarFill: { height: '100%', backgroundColor: COLORS.navy, borderRadius: RADIUS.sm },
-  progressPercent: { fontSize: 13, fontWeight: '700', color: COLORS.navy, minWidth: 32, fontFamily: FONTS.regular },
-  startReadingButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.orange, paddingHorizontal: 14, paddingVertical: 10, borderRadius: RADIUS.xl, gap: 6 },
-  startReadingText: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.white, fontFamily: FONTS.regular },
   startReadingButtonFull: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.orange, paddingVertical: 14, borderRadius: RADIUS.pill, gap: SPACING.sm, marginBottom: SPACING.sm },
   startReadingTextFull: { color: COLORS.white, fontSize: FONT_SIZES.regular, fontWeight: '700', fontFamily: FONTS.regular },
 

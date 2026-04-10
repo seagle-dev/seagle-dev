@@ -125,12 +125,32 @@ export default function ModelThumbnailCapture({ modelUrl, modelName, onCapture, 
   }, [modelUrl]);
 
   function handleCapture() {
-    if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return;
+    if (!rendererRef.current || !sceneRef.current || !cameraRef.current || !controlsRef.current) return;
     setCapturing(true);
-    rendererRef.current.render(sceneRef.current, cameraRef.current);
+    
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    
+    rendererRef.current.render(sceneRef.current, camera);
     rendererRef.current.domElement.toBlob((blob) => {
       setCapturing(false);
-      if (onCapture) onCapture(blob);
+      
+      // Extract view state
+      const viewState = {
+        cameraPosition: {
+          x: camera.position.x,
+          y: camera.position.y,
+          z: camera.position.z,
+        },
+        controlsTarget: {
+          x: controls.target.x,
+          y: controls.target.y,
+          z: controls.target.z,
+        },
+        fov: camera.fov,
+      };
+      
+      if (onCapture) onCapture({ blob, viewState });
     }, 'image/png');
   }
 
@@ -173,7 +193,7 @@ export default function ModelThumbnailCapture({ modelUrl, modelName, onCapture, 
             }}>
             {capturing ? '⏳ Capturing...' : ready ? '📸 Capture Thumbnail' : '⏳ Loading model...'}
           </button>
-          <button onClick={() => { if (onCapture) onCapture(null); }}
+          <button onClick={() => { if (onCapture) onCapture({ blob: null, viewState: null }); }}
             style={{
               padding: '10px 16px', background: '#757575', color: '#fff',
               border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer',

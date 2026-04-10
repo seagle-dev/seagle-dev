@@ -91,7 +91,7 @@ async function listModels({ search, category, page = 1, limit = 10 }) {
   const totalItems = Number(countRows[0]?.total || 0);
 
   const selectSql = `
-    SELECT m.id, m.name, m.file_url, m.thumbnail, m.category, m.uploaded_by, m.created_at
+    SELECT m.id, m.name, m.file_url, m.thumbnail, m.view_state, m.category, m.uploaded_by, m.created_at
     FROM models_3d m
     ${whereSql}
     ORDER BY m.created_at DESC
@@ -101,11 +101,25 @@ async function listModels({ search, category, page = 1, limit = 10 }) {
 
   const [rows] = await db.execute(selectSql, execParams);
 
+  const normalizeViewState = (raw) => {
+    if (!raw) return null;
+    if (typeof raw === 'object') return raw;
+    if (typeof raw === 'string') {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
   const data = rows.map(r => ({
     id: r.id,
     name: r.name,
     fileUrl: r.file_url,
     thumbnail: r.thumbnail,
+    view_state: normalizeViewState(r.view_state),
     category: r.category,
     uploadedBy: r.uploaded_by,
     createdAt: r.created_at
@@ -114,4 +128,50 @@ async function listModels({ search, category, page = 1, limit = 10 }) {
   return { data, pagination: { page: pageInt, limit: limitInt, totalItems } };
 }
 
-module.exports = { listBooks, listModels };
+/**
+ * Get annotation mappings for a specific book page.
+ * Returns array of { id, book_id, page_number, x, y, width, height, model_id, label, created_at }
+ */
+async function getMappings(bookId, pageNumber) {
+  const sql = `
+    SELECT
+      m.id,
+      m.book_id,
+      m.page_number,
+      m.x,
+      m.y,
+      m.width,
+      m.height,
+      m.model_id,
+      m.label,
+      m.created_at,
+      md.name AS model_name,
+      md.thumbnail AS model_thumbnail,
+      md.view_state AS model_view_state
+    FROM mappings m
+    LEFT JOIN models_3d md ON md.id = m.model_id
+    WHERE m.book_id = ? AND m.page_number = ?
+    ORDER BY m.id
+  `;
+  const [rows] = await db.execute(sql, [bookId, pageNumber]);
+
+  const normalizeViewState = (raw) => {
+    if (!raw) return null;
+    if (typeof raw === 'object') return raw;
+    if (typeof raw === 'string') {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  return rows.map((row) => ({
+    ...row,
+    model_view_state: normalizeViewState(row.model_view_state),
+  }));
+}
+
+module.exports = { listBooks, listModels, getMappings };

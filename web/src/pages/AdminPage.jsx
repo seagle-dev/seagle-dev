@@ -110,11 +110,11 @@ export default function AdminPage() {
     }
   }
 
-  async function handleThumbnailCaptured(blob) {
+  async function handleThumbnailCaptured({ blob, viewState }) {
     if (!pendingThumbnail) { setPendingThumbnail(null); return; }
     if (blob) {
       try {
-        await uploadModelThumbnail(pendingThumbnail.modelId, blob);
+        await uploadModelThumbnail(pendingThumbnail.modelId, blob, viewState);
         await refreshData();
       } catch (err) {
         console.error('Thumbnail upload error:', err);

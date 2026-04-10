@@ -1,10 +1,10 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { getAuthToken } from '../services/api';
 
-export default function ThreeModelViewer({ modelUrl, alt, compact, onPartClick }) {
+export default function ThreeModelViewer({ modelUrl, alt, compact, onPartClick, initialViewState }) {
   const mountRef = useRef(null);
   const rendererRef = useRef(null);
   const sceneRef = useRef(null);
@@ -101,20 +101,58 @@ export default function ThreeModelViewer({ modelUrl, alt, compact, onPartClick }
             pivot.position.y -= scaledBox.min.y;
             scene.add(pivot);
 
-            // Frame camera
+            const tryApplySavedView = () => {
+              const raw = initialViewState;
+              if (!raw) return false;
+
+              let parsed = raw;
+              if (typeof raw === 'string') {
+                try {
+                  parsed = JSON.parse(raw);
+                } catch {
+                  return false;
+                }
+              }
+
+              const cp = parsed?.cameraPosition;
+              const ct = parsed?.controlsTarget;
+              const fov = parsed?.fov;
+              const isNumber = (v) => typeof v === 'number' && Number.isFinite(v);
+
+              if (
+                !isNumber(cp?.x) || !isNumber(cp?.y) || !isNumber(cp?.z) ||
+                !isNumber(ct?.x) || !isNumber(ct?.y) || !isNumber(ct?.z)
+              ) {
+                return false;
+              }
+
+              if (isNumber(fov)) {
+                camera.fov = fov;
+                camera.updateProjectionMatrix();
+              }
+
+              controls.target.set(ct.x, ct.y, ct.z);
+              camera.position.set(cp.x, cp.y, cp.z);
+              camera.lookAt(controls.target);
+              return true;
+            };
+
+            // Frame camera (or reuse saved thumbnail view)
             const finalBox = new THREE.Box3().setFromObject(pivot);
             const finalCenter = finalBox.getCenter(new THREE.Vector3());
-            const finalSize = finalBox.getSize(new THREE.Vector3());
-            const fov = camera.fov * (Math.PI / 180);
-            const dist = (Math.max(finalSize.x, finalSize.y, finalSize.z) / 2) / Math.tan(fov / 2) * 1.5;
+            if (!tryApplySavedView()) {
+              const finalSize = finalBox.getSize(new THREE.Vector3());
+              const fov = camera.fov * (Math.PI / 180);
+              const dist = (Math.max(finalSize.x, finalSize.y, finalSize.z) / 2) / Math.tan(fov / 2) * 1.5;
 
-            controls.target.copy(finalCenter);
-            camera.position.set(
-              finalCenter.x + dist * 0.4,
-              finalCenter.y + dist * 0.3,
-              finalCenter.z + dist
-            );
-            camera.lookAt(finalCenter);
+              controls.target.copy(finalCenter);
+              camera.position.set(
+                finalCenter.x + dist * 0.4,
+                finalCenter.y + dist * 0.3,
+                finalCenter.z + dist
+              );
+              camera.lookAt(finalCenter);
+            }
             controls.update();
 
             setLoading(false);
@@ -175,7 +213,7 @@ export default function ThreeModelViewer({ modelUrl, alt, compact, onPartClick }
         container.removeChild(renderer.domElement);
       }
     };
-  }, [modelUrl, onPartClick]);
+  }, [modelUrl, onPartClick, initialViewState]);
 
   return (
     <div ref={mountRef} style={{ width: '100%', height: '100%', position: 'relative' }}>

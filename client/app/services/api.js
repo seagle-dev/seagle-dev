@@ -130,3 +130,44 @@ export function getBookCoverUrl(bookId) {
 export function getBookPdfUrl(bookId) {
   return `${BASE_URL}/admin/books/${bookId}/pdf`;
 }
+
+// ==================== READER: MAPPINGS & MODELS ====================
+
+/**
+ * Fetch annotation mappings for a specific book page.
+ * Uses the library (learner-facing) endpoint that only needs auth token.
+ * Returns array of { id, book_id, page_number, x, y, width, height, model_id, label }.
+ */
+export async function fetchMappings(bookId, page) {
+  const params = new URLSearchParams({ book_id: String(bookId), page: String(page) });
+  const data = await request(`/library/mappings?${params.toString()}`);
+  return data?.data ?? data ?? [];
+}
+
+/**
+ * Fetch ALL models (unpaginated) for building the model catalog.
+ * Uses library models endpoint with a high limit.
+ */
+export async function fetchAllModels() {
+  const data = await request('/library/models?limit=500');
+  return data?.data ?? data ?? [];
+}
+
+/**
+ * Get the proxy URL for streaming a model GLB/GLTF file (requires auth header).
+ */
+export function getModelFileUrl(modelId) {
+  return `${BASE_URL}/admin/models/${modelId}/file`;
+}
+
+/**
+ * Get the public URL for a model thumbnail image.
+ */
+export function getModelThumbnailUrl(modelId) {
+  return `${BASE_URL}/admin/models/${modelId}/thumbnail`;
+}
+
+/**
+ * Get the current auth token from AsyncStorage (sync-ish for templates).
+ */
+export { getToken as getAuthToken };

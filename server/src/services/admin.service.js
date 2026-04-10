@@ -129,14 +129,29 @@ async function deleteBook(id) {
 // ==================== 3D MODELS ====================
 
 async function listModels() {
-  const sql = `SELECT id, name, file_url, thumbnail, category, created_at FROM models_3d WHERE file_url IS NOT NULL ORDER BY created_at DESC`;
+  const sql = `SELECT id, name, file_url, thumbnail, view_state, category, created_at FROM models_3d WHERE file_url IS NOT NULL ORDER BY created_at DESC`;
   try {
     const [rows] = await db.execute(sql);
+
+    const normalizeViewState = (raw) => {
+      if (!raw) return null;
+      if (typeof raw === 'object') return raw;
+      if (typeof raw === 'string') {
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    };
+
     return rows.map(model => ({
       id: model.id,
       name: model.name,
       file_url: model.file_url,       // GCS path
       thumbnail: model.thumbnail,       // GCS path
+      view_state: normalizeViewState(model.view_state),
       category: model.category,
       created_at: model.created_at,
     }));
@@ -200,7 +215,7 @@ async function createModel({ name, category, modelFile, uploadedBy }) {
 /**
  * Upload/update a thumbnail for a model.
  */
-async function updateModelThumbnail(modelId, thumbnailBuffer) {
+async function updateModelThumbnail(modelId, thumbnailBuffer, viewState = null) {
   const thumbnailPath = await uploadBuffer(
     thumbnailBuffer,
     `models/thumbnails/${modelId}_${Date.now()}.png`,
@@ -213,7 +228,8 @@ async function updateModelThumbnail(modelId, thumbnailBuffer) {
     await deleteFileByPath(rows[0].thumbnail);
   }
 
-  await db.execute('UPDATE models_3d SET thumbnail = ? WHERE id = ?', [thumbnailPath, modelId]);
+  const viewStateJson = viewState ? JSON.stringify(viewState) : null;
+  await db.execute('UPDATE models_3d SET thumbnail = ?, view_state = ? WHERE id = ?', [thumbnailPath, viewStateJson, modelId]);
   return thumbnailPath;
 }
 

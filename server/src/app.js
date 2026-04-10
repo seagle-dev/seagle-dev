@@ -6,13 +6,23 @@ require('dotenv').config();
 const app = express();
 
 // CORS configuration
+// Allow WebView/pdf.js requests too; embedded HTML often sends a null/opaque origin.
 app.use(cors({
-  origin: [
-    process.env.CORS_ORIGIN || 'http://localhost:5173',
-    'http://localhost:8081',   // Expo web
-    'http://localhost:19006',  // Expo web alt
-  ],
-  credentials: true
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      process.env.CORS_ORIGIN || 'http://localhost:5173',
+      'http://localhost:8081',   // Expo web
+      'http://localhost:19006',  // Expo web alt
+    ];
+
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Debug: keep this permissive for native WebView readers; tighten later if needed.
+    return callback(null, true);
+  },
+  credentials: true,
 }));
 
 // Body parsing middleware

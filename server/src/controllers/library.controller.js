@@ -36,4 +36,19 @@ async function getModels(req, res) {
   }
 }
 
-module.exports = { getBooks, getModels };
+async function getMappings(req, res) {
+  try {
+    const bookId = req.query.book_id ? parseInt(req.query.book_id, 10) : null;
+    const page = req.query.page ? parseInt(req.query.page, 10) : null;
+    if (!bookId || !page) {
+      return res.status(400).json({ message: 'book_id and page query params required' });
+    }
+    const mappings = await libraryService.getMappings(bookId, page);
+    return res.json({ data: mappings });
+  } catch (err) {
+    console.error('getMappings error', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+}
+
+module.exports = { getBooks, getModels, getMappings };

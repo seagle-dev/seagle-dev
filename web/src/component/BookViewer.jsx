@@ -88,6 +88,7 @@ const InlineModelOverlay = React.memo(function InlineModelOverlay({ mapping, mod
             alt={model.name}
             compact={true}
             onPartClick={handlePartClick}
+            initialViewState={model.view_state}
           />
         </div>
       </div>
@@ -137,6 +138,7 @@ const InlineModelOverlay = React.memo(function InlineModelOverlay({ mapping, mod
               alt={model.name}
               compact={false}
               onPartClick={handlePartClick}
+              initialViewState={model.view_state}
             />
           </div>
         </div>

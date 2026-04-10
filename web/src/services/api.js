@@ -169,9 +169,12 @@ export async function uploadModel(modelFile, { name, category } = {}) {
   return unwrap(res);
 }
 
-export async function uploadModelThumbnail(modelId, thumbnailBlob) {
+export async function uploadModelThumbnail(modelId, thumbnailBlob, viewState = null) {
   const formData = new FormData();
   formData.append('thumbnail', thumbnailBlob, 'thumbnail.png');
+  if (viewState) {
+    formData.append('viewState', JSON.stringify(viewState));
+  }
 
   const res = await api.post(`/admin/models/${modelId}/thumbnail`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },

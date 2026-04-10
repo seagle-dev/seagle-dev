@@ -219,11 +219,36 @@ async function uploadModelThumbnail(req, res) {
     if (!modelId) return res.status(400).json({ message: 'Invalid model id' });
     if (!req.file) return res.status(400).json({ message: 'Thumbnail image required' });
 
-    await adminService.updateModelThumbnail(modelId, req.file.buffer);
+    let parsedViewState = null;
+    if (req.body?.viewState) {
+      try {
+        const candidate = JSON.parse(req.body.viewState);
+        const cp = candidate?.cameraPosition;
+        const ct = candidate?.controlsTarget;
+        const fov = candidate?.fov;
+        const isNumber = (n) => typeof n === 'number' && Number.isFinite(n);
+
+        if (
+          isNumber(cp?.x) && isNumber(cp?.y) && isNumber(cp?.z) &&
+          isNumber(ct?.x) && isNumber(ct?.y) && isNumber(ct?.z) &&
+          (fov === undefined || isNumber(fov))
+        ) {
+          parsedViewState = {
+            cameraPosition: { x: cp.x, y: cp.y, z: cp.z },
+            controlsTarget: { x: ct.x, y: ct.y, z: ct.z },
+            ...(fov !== undefined ? { fov } : {}),
+          };
+        }
+      } catch (e) {
+        console.warn('Invalid viewState JSON for model', modelId);
+      }
+    }
+
+    await adminService.updateModelThumbnail(modelId, req.file.buffer, parsedViewState);
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const thumbnailUrl = `${baseUrl}/api/admin/models/${modelId}/thumbnail`;
-    return res.json({ data: { thumbnail: thumbnailUrl } });
+    return res.json({ data: { thumbnail: thumbnailUrl, view_state: parsedViewState } });
   } catch (err) {
     console.error('uploadModelThumbnail error', err);
     return res.status(500).json({ message: 'Server error', error: err.message });
