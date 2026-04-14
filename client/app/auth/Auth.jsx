@@ -1,7 +1,7 @@
 import React from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useRouter } from 'expo-router'
-import { login } from '../services/api'
+import { login } from '../../services/api'
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native'
-import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../constants/theme'
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme'
 
 export default function Auth() {
   const { signIn } = useAuth()
@@ -67,6 +67,7 @@ export default function Auth() {
             keyboardType="email-address"
             autoCapitalize="none"
             style={styles.input}
+            editable={!isLoading}
           />
         </View>
 
@@ -79,6 +80,7 @@ export default function Auth() {
             placeholderTextColor="#999999ce"
             secureTextEntry
             style={styles.input}
+            editable={!loading}
           />
         </View>
 

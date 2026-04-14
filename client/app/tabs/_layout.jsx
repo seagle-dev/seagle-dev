@@ -3,7 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { Slot } from 'expo-router';
 import TopHeader from '../components/TopHeader';
 import NavigationBar from '../components/NavigationBar';
-import { COLORS } from '../constants/theme';
+import { COLORS } from '../../constants/theme';
 
 export default function TabsLayout() {
   return (

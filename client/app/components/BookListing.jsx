@@ -6,15 +6,14 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { fetchHome, getBookCoverUrl } from '../services/api';
-import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../constants/theme';
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme';
 import LoadingView from './LoadingView';
 
 const PLACEHOLDER_COVER = 'https://via.placeholder.com/200x300?text=No+Cover';
-
+const router = useRouter;
 const mapRecentBook = (b) => ({
   id: String(b.id),
   title: b.title,
@@ -40,7 +39,6 @@ export default function BookListing() {
   const [recentBooks, setRecentBooks] = useState([]);
   const [trendingBooks, setTrendingBooks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
 
   useEffect(() => {
     (async () => {

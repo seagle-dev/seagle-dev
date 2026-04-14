@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../constants/theme';
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme';
 
 /**
  * Reusable badge/chip component with filled and outline variants.

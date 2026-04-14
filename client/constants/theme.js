@@ -104,3 +104,14 @@ export const SHADOWS = {
     elevation: 8,
   },
 };
+
+const theme = {
+  COLORS,
+  FONTS,
+  SPACING,
+  RADIUS,
+  FONT_SIZES,
+  SHADOWS,
+}
+
+export default theme;

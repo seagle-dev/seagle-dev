@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import TextbooksTab from './TextbooksTab';
 import ModelsTab from './ModelsTab';
-import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../constants/theme';
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme';
 
 const { width } = Dimensions.get('window');
 const CATEGORIES = ['All Categories', 'Anatomy', 'Physiology', 'Surgery', 'Medicine', 'Nursing'];

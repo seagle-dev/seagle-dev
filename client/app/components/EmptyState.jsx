@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, FONTS, FONT_SIZES, SPACING } from '../constants/theme';
+import { COLORS, FONTS, FONT_SIZES, SPACING } from '../../constants/theme';
 
 /**
  * Reusable empty-state placeholder with icon, title, and subtitle.

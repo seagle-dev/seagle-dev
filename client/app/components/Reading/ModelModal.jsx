@@ -22,8 +22,8 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme';
-import { getModelFileUrl } from '../../services/api';
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../../constants/theme';
+import { getModelFileUrl } from '../../../services/api';
 import getModelViewerHtml from './modelViewerHtml';
 
 const ModelModal = memo(function ModelModal({ visible, model, authToken, onClose }) {

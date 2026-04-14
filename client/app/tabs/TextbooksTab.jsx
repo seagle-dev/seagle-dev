@@ -11,8 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { fetchBooks, getBookCoverUrl } from '../services/api';
-import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../constants/theme';
+import { fetchBooks, getBookCoverUrl } from '../../services/api';
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme';
 import usePaginatedList from '../hooks/usePaginatedList';
 import LoadingView from '../components/LoadingView';
 import EmptyState from '../components/EmptyState';

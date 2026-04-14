@@ -11,7 +11,7 @@
  *   x/y/width/height are decimals (0–1) representing percentage positions
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { fetchMappings, fetchAllModels } from '../services/api';
+import { fetchMappings, fetchAllModels } from '../../services/api';
 
 export default function useAnnotations(bookId, currentPage) {
   const cacheRef = useRef(new Map());

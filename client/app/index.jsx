@@ -1,4 +1,3 @@
-// app/index.jsx
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -25,23 +24,27 @@ export default function Index() {
       try {
         const stored = await AsyncStorage.getItem('user');
         setHasUser(!!stored);
+      } catch (e) {
+        console.error("Auth check error", e);
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
+  // While fonts are loading or we are checking the token, show a spinner
   if (loading || !fontsLoaded) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#FF8C42" />
       </View>
     );
   }
 
+  // Once ready, redirect
   return hasUser ? <Redirect href="/tabs" /> : <Redirect href="/auth/Auth" />;
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
 });

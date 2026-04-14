@@ -8,7 +8,7 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native'
-import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../constants/theme'
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme'
 
 export default function SuccessScreen() {
   const router = useRouter()

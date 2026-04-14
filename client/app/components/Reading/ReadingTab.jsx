@@ -23,8 +23,8 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme';
-import { getBookPdfUrl } from '../../services/api';
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../../constants/theme';
+import { getBookPdfUrl } from '../../../services/api';
 import useAnnotations from '../../hooks/useAnnotations';
 import PdfViewer from './PdfViewer';
 import ModelModal from './ModelModal';

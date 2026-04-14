@@ -3,7 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import TopHeader from '../components/TopHeader';
 import ReadingTab from '../components/Reading/ReadingTab';
-import { COLORS } from '../constants/theme';
+import { COLORS } from '../../constants/theme';
 
 export default function Reader() {
   const router = useRouter();

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import { COLORS, FONTS, FONT_SIZES, SPACING } from '../constants/theme';
+import { COLORS, FONTS, FONT_SIZES, SPACING } from '../../constants/theme';
 
 /**
  * Reusable full-screen centered loading spinner with optional message.

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useRouter } from 'expo-router'
-import { register } from '../services/api'
+import { register } from '../../services/api'
 import { useAuth } from '../context/AuthContext'
 import {
   View,
@@ -17,7 +17,7 @@ import {
   Platform,
   Alert,
 } from 'react-native'
-import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../constants/theme'
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme'
 
 export default function SignUpScreen() {
   const router = useRouter()

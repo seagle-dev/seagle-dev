@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, Platfor
 import { Ionicons } from '@expo/vector-icons';
 import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, FONTS, FONT_SIZES, SPACING } from '../constants/theme';
+import { COLORS, FONTS, FONT_SIZES, SPACING } from '../../constants/theme';
 
 const { width } = Dimensions.get('window');
 

@@ -10,8 +10,8 @@ import {
   RefreshControl,
   Dimensions,
 } from 'react-native';
-import { fetchModels } from '../services/api';
-import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../constants/theme';
+import { fetchModels } from '../../services/api';
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
 import usePaginatedList from '../hooks/usePaginatedList';
 import LoadingView from '../components/LoadingView';
 import EmptyState from '../components/EmptyState';

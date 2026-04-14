@@ -17,7 +17,7 @@
 import React, { useRef, useEffect, useCallback, memo } from 'react';
 import { StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { getModelThumbnailUrl, getModelFileUrl } from '../../services/api';
+import { getModelThumbnailUrl, getModelFileUrl } from '../../../services/api';
 import getPdfViewerHtml from './pdfViewerHtml';
 
 const PdfViewer = memo(function PdfViewer({
