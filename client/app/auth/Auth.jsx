@@ -1,12 +1,7 @@
-<<<<<<< HEAD
-import { useState } from 'react'
-import { useRouter } from 'expo-router'
-=======
 import React from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useRouter } from 'expo-router'
 import { login } from '../services/api'
->>>>>>> 99037158edb5ad25e847a076a76812966a78ad73
 import {
   View,
   Text,
@@ -17,35 +12,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-<<<<<<< HEAD
-  ActivityIndicator,
-  Alert,
-} from 'react-native'
-import { useAuth } from '../../context/AuthContext'
-
-export default function Auth() {
-  const router = useRouter()
-  const { login } = useAuth()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [staySigned, setStaySigned] = useState(false)
-  const [loading, setLoading] = useState(false)
-
-  const handleSignIn = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password.')
-      return
-    }
-    setLoading(true)
-    try {
-      await login(email.trim(), password)
-      router.replace('/tabs')
-    } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Login failed'
-      Alert.alert('Login Failed', msg)
-    } finally {
-      setLoading(false)
-=======
   Alert,
   ActivityIndicator,
 } from 'react-native'
@@ -74,7 +40,6 @@ export default function Auth() {
       Alert.alert('Login Failed', err.message || 'Invalid credentials')
     } finally {
       setIsLoading(false)
->>>>>>> 99037158edb5ad25e847a076a76812966a78ad73
     }
   }
 
@@ -137,21 +102,12 @@ export default function Auth() {
         </View>
 
         <TouchableOpacity
-<<<<<<< HEAD
-          style={[styles.loginButton, loading && { opacity: 0.7 }]}
-          onPress={handleSignIn}
-          activeOpacity={0.9}
-          disabled={loading}
-        >
-          {loading ? (
-=======
           style={[styles.loginButton, isLoading && { opacity: 0.7 }]}
           onPress={handleSignIn}
           activeOpacity={0.9}
           disabled={isLoading}
         >
           {isLoading ? (
->>>>>>> 99037158edb5ad25e847a076a76812966a78ad73
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.loginText}>Log In</Text>
@@ -160,11 +116,7 @@ export default function Auth() {
 
         <View style={styles.signUpRow}>
           <Text style={styles.noAccount}>Don't have an account?</Text>
-<<<<<<< HEAD
-          <TouchableOpacity onPress={() => router.push('/screens/SignUpScreen')}>
-=======
           <TouchableOpacity onPress={() => router.push('../screens/SignUpScreen')}>
->>>>>>> 99037158edb5ad25e847a076a76812966a78ad73
             <Text style={styles.signUpLink}> Sign Up</Text>
           </TouchableOpacity>
         </View>
@@ -223,22 +175,12 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-<<<<<<< HEAD
-    borderColor: '#e5e7eb',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 8,
-    fontStyle: '#ffffff9d',
-    backgroundColor: '#fff',
-    fontSize: 16,
-=======
     borderColor: COLORS.borderInput,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.bgWhite,
     fontSize: FONT_SIZES.lg,
->>>>>>> 99037158edb5ad25e847a076a76812966a78ad73
   },
   row: {
     marginTop: SPACING.sm,
