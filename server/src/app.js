@@ -5,14 +5,6 @@ require('dotenv').config();
 
 const app = express();
 
-<<<<<<< HEAD
-// CORS configuration – allow web admin + Expo dev client
-app.use(cors({
-  origin: process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
-    : ['http://localhost:5173', 'http://localhost:8081'],
-  credentials: true
-=======
 // CORS configuration
 // Allow WebView/pdf.js requests too; embedded HTML often sends a null/opaque origin.
 app.use(cors({
@@ -31,7 +23,6 @@ app.use(cors({
     return callback(null, true);
   },
   credentials: true,
->>>>>>> 99037158edb5ad25e847a076a76812966a78ad73
 }));
 
 // Body parsing middleware
@@ -69,15 +60,6 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
 // ========== API ROUTES ==========
 const authRoutes = require('./routes/auth.routes');
 const adminRoutes = require('./routes/admin.routes');
-<<<<<<< HEAD
-const homeRoutes = require('./routes/home.routes');
-const libraryRoutes = require('./routes/library.routes');
-
-app.use('/api/auth', authRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/home', homeRoutes);
-app.use('/api/library', libraryRoutes);
-=======
 const libraryRoutes = require('./routes/library.routes');
 const homeRoutes = require('./routes/home.routes');
 
@@ -86,7 +68,6 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/library', libraryRoutes);
 app.use('/api/home', homeRoutes);
 
->>>>>>> 99037158edb5ad25e847a076a76812966a78ad73
 
 // Health check
 app.get('/api/health', (req, res) => {

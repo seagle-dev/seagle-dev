@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: FONT_SIZES.xl,
     fontWeight: '700',
-    color: COLORS.textPrimary,
+    color: COLORS.navy,
     marginTop: SPACING.lg,
     fontFamily: FONTS.serifBold,
   },

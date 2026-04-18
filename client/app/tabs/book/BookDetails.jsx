@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
 
   infoColumn: { flex: 1, paddingTop: 2 },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  bookTitle: { flex: 1, fontSize: FONT_SIZES.xxl, fontWeight: '700', color: COLORS.textPrimary, lineHeight: 26, marginBottom: 2, marginRight: SPACING.sm, fontFamily: FONTS.serifBold },
+  bookTitle: { flex: 1, fontSize: FONT_SIZES.xxl, fontWeight: '700', color: COLORS.navy, lineHeight: 26, marginBottom: 2, marginRight: SPACING.sm, fontFamily: FONTS.serifBold },
   shareButton: { padding: SPACING.xs, marginTop: 2 },
   bookAuthor: { fontSize: FONT_SIZES.body, color: COLORS.textSecondary, marginBottom: SPACING.md, fontFamily: FONTS.regular },
 
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
 
   ownedActions: { marginTop: SPACING.xs, marginBottom: SPACING.sm },
   startReadingButtonFull: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.orange, paddingVertical: 14, borderRadius: RADIUS.pill, gap: SPACING.sm, marginBottom: SPACING.sm },
-  startReadingTextFull: { color: COLORS.white, fontSize: FONT_SIZES.regular, fontWeight: '700', fontFamily: FONTS.regular },
+  startReadingTextFull: { color: COLORS.white, fontSize: FONT_SIZES.regular, fontWeight: '700', fontFamily: FONTS.bold },
 
   sectionDivider: { height: 1, backgroundColor: COLORS.border, marginVertical: SPACING.xl },
   sectionTitle: { fontSize: FONT_SIZES.xl, fontWeight: '700', color: COLORS.navy, marginBottom: SPACING.md, fontFamily: FONTS.serifBold },
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
 
   categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md },
   categoryChip: { backgroundColor: COLORS.orange, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.sm, borderRadius: RADIUS.xl },
-  categoryChipText: { fontSize: 13, color: COLORS.white, fontWeight: '600', fontFamily: FONTS.regular },
+  categoryChipText: { fontSize: 13, color: COLORS.navy, fontWeight: '600', fontFamily: FONTS.medium },
 
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
   authorAvatar: { width: 48, height: 48, borderRadius: RADIUS.pill, backgroundColor: COLORS.navy, justifyContent: 'center', alignItems: 'center' },
