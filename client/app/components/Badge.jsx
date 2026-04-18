@@ -19,7 +19,7 @@ export default function Badge({
   style,
 }) {
   const isFilled = variant === 'filled';
-  const resolvedTextColor = textColor || (isFilled ? COLORS.white : color);
+  const resolvedTextColor = textColor || (isFilled ? (color === COLORS.orange ? COLORS.navy : COLORS.white) : color);
 
   return (
     <View

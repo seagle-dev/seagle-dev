@@ -190,7 +190,7 @@ export default function SignUpScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bgWhite },
   scrollContent: { flexGrow: 1, paddingHorizontal: SPACING.xxl, paddingTop: 40, paddingBottom: 30 },
-  title: { fontSize: FONT_SIZES.xxl, fontWeight: '600', textAlign: 'center', marginBottom: 30, color: COLORS.black, fontFamily: FONTS.bold },
+  title: { fontSize: FONT_SIZES.xxl, fontWeight: '600', textAlign: 'center', marginBottom: 30, color: COLORS.navy, fontFamily: FONTS.bold },
   form: { flex: 1 },
   inputGroup: { marginBottom: SPACING.xl },
   label: { fontSize: FONT_SIZES.body, fontWeight: '500', marginBottom: SPACING.sm, color: COLORS.black, fontFamily: FONTS.regular },

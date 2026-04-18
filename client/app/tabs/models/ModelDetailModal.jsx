@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   },
   overlayTouch: { flex: 1 },
   modalContainer: {
-    backgroundColor: COLORS.bgSecondary,
+    backgroundColor: COLORS.bgWhite,
     borderTopLeftRadius: RADIUS.xxl,
     borderTopRightRadius: RADIUS.xxl,
     maxHeight: SCREEN_HEIGHT * 0.88,
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: COLORS.bgTertiary,
+    backgroundColor: COLORS.borderLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   modelName: {
     fontSize: FONT_SIZES.xl,
     fontWeight: '700',
-    color: COLORS.textPrimary,
+    color: COLORS.navy,
     marginBottom: SPACING.sm,
     lineHeight: 28,
     fontFamily: FONTS.serifBold,

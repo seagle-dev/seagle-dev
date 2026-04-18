@@ -10,9 +10,9 @@ const { width } = Dimensions.get('window');
 const TABS = [
   { name: 'Home', icon: 'home', href: '/tabs' },
   { name: 'Library', icon: 'book', href: '/tabs/library' },
-  { name: 'Classroom', icon: 'school', href: '/tabs' },
-  { name: 'Quizzes', icon: 'bulb', href: '/tabs' },
-  { name: 'Slides', icon: 'easel', href: '/tabs' },
+  { name: 'Classroom', icon: 'school', href: '/tabs/classroom' },
+  { name: 'Quizzes', icon: 'bulb', href: '/tabs/quizzes' },
+  { name: 'Slides', icon: 'easel', href: '/tabs/slides' },
 ];
 
 const LIBRARY_PATHS = ['/tabs/library', '/tabs/book', '/tabs/models', '/tabs/Reader'];
@@ -23,6 +23,9 @@ export default function NavigationBar() {
   const insets = useSafeAreaInsets();
 
   const activeIndex = useMemo(() => {
+    if (pathname.startsWith('/tabs/classroom')) return 2;
+    if (pathname.startsWith('/tabs/quizzes')) return 3;
+    if (pathname.startsWith('/tabs/slides')) return 4;
     if (LIBRARY_PATHS.some((p) => pathname.startsWith(p))) return 1;
     if (pathname === '/tabs' || pathname === '/tabs/index') return 0;
     return 0;

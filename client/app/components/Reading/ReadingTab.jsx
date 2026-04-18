@@ -163,7 +163,7 @@ export default function ReadingTab({ book }) {
           <Ionicons
             name="chevron-back"
             size={20}
-            color={currentPage <= 1 ? COLORS.textMuted : COLORS.white}
+            color={currentPage <= 1 ? COLORS.textMuted : COLORS.navy}
           />
           <Text
             style={[
@@ -204,7 +204,7 @@ export default function ReadingTab({ book }) {
             color={
               totalPages && currentPage >= totalPages
                 ? COLORS.textMuted
-                : COLORS.white
+                : COLORS.navy
             }
           />
         </TouchableOpacity>
@@ -301,9 +301,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     paddingBottom: Platform.OS === 'ios' ? SPACING.xl : SPACING.md,
-    backgroundColor: COLORS.navyDeep,
+    backgroundColor: COLORS.white,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: COLORS.borderLight,
   },
   navBtn: {
     flexDirection: 'row',
@@ -311,14 +311,14 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.md,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: COLORS.bgLight,
     gap: 4,
   },
   navBtnDisabled: {
     opacity: 0.4,
   },
   navBtnText: {
-    color: COLORS.white,
+    color: COLORS.navy,
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',
     fontFamily: FONTS.medium,
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   navPageText: {
-    color: 'rgba(255,255,255,0.8)',
+    color: COLORS.textPrimary,
     fontSize: FONT_SIZES.sm,
     fontFamily: FONTS.regular,
   },

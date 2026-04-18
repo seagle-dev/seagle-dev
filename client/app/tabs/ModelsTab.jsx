@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   modelImage: {
     width: '100%',
     height: width - 32 - 20,
-    backgroundColor: '#2a2a2a',
+    backgroundColor: COLORS.navyDark,
   },
   modelInfo: {
     padding: SPACING.lg,
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
   modelName: {
     fontSize: FONT_SIZES.xl,
     fontWeight: '700',
-    color: COLORS.textPrimary,
+    color: COLORS.navy,
     marginBottom: SPACING.md,
     lineHeight: 24,
     fontFamily: FONTS.serifBold,

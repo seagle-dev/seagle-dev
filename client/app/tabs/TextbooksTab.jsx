@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   bookTitle: {
     fontSize: FONT_SIZES.regular,
     fontWeight: '700',
-    color: COLORS.textPrimary,
+    color: COLORS.navy,
     lineHeight: 20,
     marginBottom: 2,
     fontFamily: FONTS.serifBold,
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
     color: COLORS.navy,
-    fontFamily: FONTS.regular,
+    fontFamily: FONTS.medium,
   },
   separator: {
     height: 1,

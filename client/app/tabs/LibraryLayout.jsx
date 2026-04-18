@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     fontWeight: '600',
     color: COLORS.textMuted,
-    fontFamily: FONTS.regular,
+    fontFamily: FONTS.medium,
   },
   tabTextActive: {
     color: COLORS.navy,
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   dropdownTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
-    color: COLORS.textPrimary,
+    color: COLORS.navy,
     marginBottom: SPACING.sm,
     textAlign: 'center',
     fontFamily: FONTS.serifBold,
@@ -282,15 +282,16 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   dropdownItemActive: {
-    backgroundColor: COLORS.bgAccent,
+    backgroundColor: COLORS.bgLight,
   },
   dropdownItemText: {
     fontSize: FONT_SIZES.md,
-    color: COLORS.textLight,
+    color: COLORS.textSecondary,
     fontFamily: FONTS.regular,
   },
   dropdownItemTextActive: {
     color: COLORS.navy,
     fontWeight: '700',
+    fontFamily: FONTS.bold,
   },
 });

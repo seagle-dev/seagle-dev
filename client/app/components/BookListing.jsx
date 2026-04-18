@@ -187,12 +187,12 @@ const styles = StyleSheet.create({
   trendingCardContent: { flexDirection: 'row', padding: SPACING.lg, paddingBottom: SPACING.md },
   trendingCover: { width: 100, height: 150, borderRadius: SPACING.md, marginRight: SPACING.lg },
   trendingBookInfo: { flex: 1, justifyContent: 'flex-start', paddingTop: SPACING.xs },
-  trendingBookTitle: { fontSize: 17, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.xs, lineHeight: 22, fontFamily: FONTS.serifBold },
+  trendingBookTitle: { fontSize: 17, fontWeight: '700', color: COLORS.navy, marginBottom: SPACING.xs, lineHeight: 22, fontFamily: FONTS.serifBold },
   trendingBookAuthor: { fontSize: 13, color: COLORS.textSecondary, marginBottom: SPACING.md, fontFamily: FONTS.light },
 
   priceBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.orangeLight, paddingHorizontal: SPACING.md, paddingVertical: 6, borderRadius: RADIUS.pill, alignSelf: 'flex-start', borderWidth: 1, borderColor: COLORS.navy },
-  priceLabel: { fontSize: FONT_SIZES.md, fontWeight: '600', color: COLORS.navy, marginRight: SPACING.xs, fontFamily: FONTS.regular },
-  priceText: { fontSize: FONT_SIZES.md, fontWeight: '800', color: COLORS.navy, fontFamily: FONTS.regular },
+  priceLabel: { fontSize: FONT_SIZES.md, fontWeight: '600', color: COLORS.navy, marginRight: SPACING.xs, fontFamily: FONTS.medium },
+  priceText: { fontSize: FONT_SIZES.md, fontWeight: '800', color: COLORS.navy, fontFamily: FONTS.bold },
 
   bottomSpacing: { height: SPACING.xl },
 });

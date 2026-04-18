@@ -25,6 +25,6 @@ const styles = StyleSheet.create({
   contentClip: {
     flex: 1,
     overflow: 'hidden',
-    backgroundColor: COLORS.bgSecondary,
+    backgroundColor: COLORS.bgPrimary,
   },
 });

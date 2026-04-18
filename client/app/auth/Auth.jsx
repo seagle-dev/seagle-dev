@@ -80,7 +80,7 @@ export default function Auth() {
             placeholderTextColor="#999999ce"
             secureTextEntry
             style={styles.input}
-            editable={!loading}
+            editable={!isLoading}
           />
         </View>
 
