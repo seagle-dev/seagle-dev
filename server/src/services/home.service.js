@@ -26,7 +26,7 @@ async function getTrending() {
     SELECT b.id, b.title, b.cover_image, b.pdf_url, b.category, COUNT(uba.id) AS read_count
     FROM user_book_activity uba
     JOIN books b ON uba.book_id = b.id
-    GROUP BY b.id
+    GROUP BY b.id, b.title, b.cover_image, b.pdf_url, b.category
     ORDER BY read_count DESC
     LIMIT 5
   `;

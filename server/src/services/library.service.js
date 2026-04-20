@@ -32,7 +32,7 @@ async function listBooks({ search, category, page = 1, limit = 10, sort = 'newes
       FROM books b
       LEFT JOIN user_book_activity uba ON uba.book_id = b.id
       ${whereSql}
-      GROUP BY b.id
+      GROUP BY b.id, b.title, b.description, b.cover_image, b.pdf_url, b.category, b.uploaded_by, b.created_at
       ORDER BY read_count DESC, b.created_at DESC
       LIMIT ${limitInt} OFFSET ${offset}
     `;
@@ -43,7 +43,7 @@ async function listBooks({ search, category, page = 1, limit = 10, sort = 'newes
       FROM books b
       LEFT JOIN user_book_activity uba ON uba.book_id = b.id
       ${whereSql}
-      GROUP BY b.id
+      GROUP BY b.id, b.title, b.description, b.cover_image, b.pdf_url, b.category, b.uploaded_by, b.created_at
       ORDER BY b.created_at DESC
       LIMIT ${limitInt} OFFSET ${offset}
     `;

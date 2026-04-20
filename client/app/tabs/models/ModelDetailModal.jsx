@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,16 +10,26 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../../constants/theme';
+import ModelModal from '../../components/Reading/ModelModal';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function ModelDetailModal({ visible, model, onClose }) {
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [authToken, setAuthToken] = useState(null);
+
+  useEffect(() => {
+    if (visible) {
+      AsyncStorage.getItem('token').then(setAuthToken);
+    }
+  }, [visible]);
+
   if (!model) return null;
 
   const handleView3D = () => {
-    console.log('Open 3D viewer for:', model.name, model.fileUrl);
-    // TODO: Navigate to a 3D viewer screen when implemented
+    setViewerVisible(true);
   };
 
   return (
@@ -117,6 +127,13 @@ export default function ModelDetailModal({ visible, model, onClose }) {
           </ScrollView>
         </View>
       </View>
+
+      <ModelModal
+        visible={viewerVisible}
+        model={model}
+        authToken={authToken}
+        onClose={() => setViewerVisible(false)}
+      />
     </Modal>
   );
 }

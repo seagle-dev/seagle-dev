@@ -4,8 +4,8 @@ import { Platform } from 'react-native';
 
 // Android emulator uses 10.0.2.2 to reach host machine's localhost
 const DEFAULT_BASE = Platform.OS === 'android'
-  ? 'http://10.0.2.2:5000/api'
-  : 'http://localhost:5000/api';
+  ? 'http://10.0.2.2:5001/api'
+  : 'http://localhost:5001/api';
 
 export const api = axios.create({
   baseURL: DEFAULT_BASE,
@@ -83,6 +83,16 @@ export async function fetchModels({ search, category, page = 1, limit = 10 } = {
   return res.data;
 }
 
+export async function fetchAllModels() {
+  const res = await api.get('/library/models', { params: { limit: 1000 } });
+  return res.data.data || res.data;
+}
+
+export async function fetchMappings(bookId, page) {
+  const res = await api.get('/library/mappings', { params: { book_id: bookId, page } });
+  return res.data.data || res.data;
+}
+
 // ==================== HOME (auth required) ====================
 
 export async function fetchHome() {
@@ -104,5 +114,19 @@ export function getBookCoverUrl(bookId) {
  */
 export function getBookPdfUrl(bookId) {
   return `${DEFAULT_BASE}/admin/books/${bookId}/pdf`;
+}
+
+/**
+ * Build the full URL for a model file (GLB/GLTF).
+ */
+export function getModelFileUrl(modelId) {
+  return `${DEFAULT_BASE}/admin/models/${modelId}/file`;
+}
+
+/**
+ * Build the full URL for a model thumbnail.
+ */
+export function getModelThumbnailUrl(modelId) {
+  return `${DEFAULT_BASE}/admin/models/${modelId}/thumbnail`;
 }
 

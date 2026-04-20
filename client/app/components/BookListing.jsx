@@ -11,9 +11,11 @@ import {
 import { useRouter } from 'expo-router';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme';
 import LoadingView from './LoadingView';
+import { fetchHome, getBookCoverUrl } from '../../services/api';
+import { Ionicons } from '@expo/vector-icons';
 
 const PLACEHOLDER_COVER = 'https://via.placeholder.com/200x300?text=No+Cover';
-const router = useRouter;
+
 const mapRecentBook = (b) => ({
   id: String(b.id),
   title: b.title,
@@ -22,6 +24,7 @@ const mapRecentBook = (b) => ({
   chapter: '',
   image: b.coverImage ? getBookCoverUrl(b.id) : PLACEHOLDER_COVER,
   coverColor: '#4A90E2',
+  pdfUrl: b.pdfUrl,
 });
 
 const mapTrendingBook = (b) => ({
@@ -33,9 +36,11 @@ const mapTrendingBook = (b) => ({
   image: b.coverImage ? getBookCoverUrl(b.id) : PLACEHOLDER_COVER,
   rating: 4.5,
   reviews: b.readCount || 0,
+  pdfUrl: b.pdfUrl,
 });
 
 export default function BookListing() {
+  const router = useRouter();
   const [recentBooks, setRecentBooks] = useState([]);
   const [trendingBooks, setTrendingBooks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +67,7 @@ export default function BookListing() {
       title: book.title,
       author: book.author,
       image: book.image,
+      pdfUrl: book.pdfUrl,
       isOwned: book.progress !== undefined,
       ...(book.progress !== undefined
         ? { progress: book.progress, currentChapter: book.chapter }
