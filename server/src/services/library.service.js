@@ -5,7 +5,7 @@ async function listBooks({ search, category, page = 1, limit = 10, sort = 'newes
   const pageInt = Number.isFinite(Number(page)) ? Math.max(1, Number(page)) : 1;
   const offset = (pageInt - 1) * limitInt;
 
-  const where = ['1=1'];
+  const where = ['b.pdf_url IS NOT NULL'];
   const params = [];
 
   if (search) {

@@ -8,7 +8,7 @@ const { detectImagesOnPage: detectImagesFromPdf } = require('./pdfDetection.serv
 async function listBooks() {
   console.log('listBooks called');
   try {
-    const sql = `SELECT id, title, description, cover_image, pdf_url, category, created_at FROM books ORDER BY created_at DESC`;
+    const sql = `SELECT id, title, description, cover_image, pdf_url, category, created_at FROM books WHERE pdf_url IS NOT NULL ORDER BY created_at DESC`;
     const [rows] = await db.execute(sql);
     console.log('listBooks result:', rows?.length || 0, 'rows');
     return rows || [];
