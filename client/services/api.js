@@ -2,10 +2,11 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-// Android emulator uses 10.0.2.2 to reach host machine's localhost
-const DEFAULT_BASE = Platform.OS === 'android'
-  ? 'http://10.0.2.2:5000/api'
-  : 'http://localhost:5000/api';
+// Replace this with your computer's current local Wi-Fi IP address.
+// This single IP will work for Expo Go on physical devices, iOS Simulators, and Android Emulators.
+const HOST_IP = '10.204.15.213';
+
+const DEFAULT_BASE = `http://${HOST_IP}:5000/api`;
 
 export const api = axios.create({
   baseURL: DEFAULT_BASE,
