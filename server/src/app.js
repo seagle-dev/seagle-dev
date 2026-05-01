@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-require('dotenv').config();
+require('dotenv').config({ override: true });
 
 const app = express();
 
@@ -72,6 +72,18 @@ app.use('/api/home', homeRoutes);
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Test endpoint to verify database connection (moved from server.js)
+app.get('/localhost', async (req, res) => {
+  const db = require('./config/db');
+  try {
+    const [rows] = await db.query('SELECT 1 + 1 AS result');
+    res.json({ message: "Connected!", data: rows });
+  } catch (err) {
+    console.error('Database connection error:', err);
+    res.status(500).json({ error: "Database connection failed", details: err.message });
+  }
 });
 
 // ========== ERROR HANDLERS ==========

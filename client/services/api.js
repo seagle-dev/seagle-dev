@@ -4,8 +4,8 @@ import { Platform } from 'react-native';
 
 // Android emulator uses 10.0.2.2 to reach host machine's localhost
 const DEFAULT_BASE = Platform.OS === 'android'
-  ? 'http://10.0.2.2:5001/api'
-  : 'http://localhost:5001/api';
+  ? 'http://10.0.2.2:5000/api'
+  : 'http://localhost:5000/api';
 
 export const api = axios.create({
   baseURL: DEFAULT_BASE,
@@ -63,6 +63,11 @@ export async function refreshToken() {
   const { token } = res.data;
   await setToken(token);
   return token;
+}
+
+export async function fetchProfile() {
+  const res = await api.get('/auth/profile');
+  return res.data;
 }
 
 // ==================== LIBRARY (public) ====================

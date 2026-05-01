@@ -155,6 +155,7 @@ export default function BookViewer({ book }) {
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewerKey, setViewerKey] = useState(0);
+  const [show3DDiagrams, setShow3DDiagrams] = useState(true);
 
   useEffect(() => {
     if (book?.id) {
@@ -220,7 +221,7 @@ export default function BookViewer({ book }) {
         {props.canvasLayer.children}
         {props.textLayer.children}
         {props.annotationLayer.children}
-        {currentPageMappings.length > 0 && (
+        {show3DDiagrams && currentPageMappings.length > 0 && (
           <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 5 }}>
             {currentPageMappings.map((mapping) => {
               const model = modelMap.get(mapping.model_id);
@@ -234,7 +235,7 @@ export default function BookViewer({ book }) {
         )}
       </>
     );
-  }, [pageMappings, modelMap]);
+  }, [pageMappings, modelMap, show3DDiagrams]);
 
   if (loading) {
     return (
@@ -258,9 +259,47 @@ export default function BookViewer({ book }) {
         alignItems: 'center',
         justifyContent: 'space-between',
       }}>
-        <h2 style={{ margin: 0, color: '#fff', fontSize: '18px', fontWeight: '500' }}>
-          {book?.title || 'Book Viewer'}
-        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <h2 style={{ margin: 0, color: '#fff', fontSize: '18px', fontWeight: '500' }}>
+            {book?.title || 'Book Viewer'}
+          </h2>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '20px', borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
+            <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px', fontWeight: '500' }}>3D VIEWS</span>
+            <label style={{
+              position: 'relative',
+              display: 'inline-block',
+              width: '40px',
+              height: '20px',
+              cursor: 'pointer'
+            }}>
+              <input 
+                type="checkbox" 
+                checked={show3DDiagrams}
+                onChange={() => setShow3DDiagrams(!show3DDiagrams)}
+                style={{ opacity: 0, width: 0, height: 0 }}
+              />
+              <span style={{
+                position: 'absolute',
+                top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: show3DDiagrams ? '#2ecc71' : '#95a5a6',
+                transition: '0.3s',
+                borderRadius: '20px'
+              }}>
+                <span style={{
+                  position: 'absolute',
+                  height: '16px',
+                  width: '16px',
+                  left: show3DDiagrams ? '22px' : '2px',
+                  bottom: '2px',
+                  backgroundColor: 'white',
+                  transition: '0.3s',
+                  borderRadius: '50%'
+                }} />
+              </span>
+            </label>
+          </div>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button onClick={() => goToPage(pageNumber - 1)} disabled={pageNumber <= 1}
             style={{ ...navBtnStyle, opacity: pageNumber <= 1 ? 0.4 : 1, cursor: pageNumber <= 1 ? 'not-allowed' : 'pointer' }}>
