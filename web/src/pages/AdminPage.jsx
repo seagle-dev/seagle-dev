@@ -5,6 +5,7 @@ import {
 } from '../services/api';
 import PdfAnnotator from '../component/PdfAnnotator';
 import ModelThumbnailCapture from '../component/ModelThumbnailCapture';
+import ConfirmationModal from '../component/ConfirmationModal';
 
 setToken(localStorage.getItem('token') || '');
 
@@ -13,6 +14,14 @@ export default function AdminPage() {
   const [models, setModels] = useState([]);
   const [selectedBook, setSelectedBook] = useState(null);
   const [activeTab, setActiveTab] = useState('annotate');
+
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   // Upload states
   const [uploadingBook, setUploadingBook] = useState(false);
@@ -72,18 +81,26 @@ export default function AdminPage() {
   }
 
   async function handleDeleteBook(id) {
-    if (!confirm('Delete this book and all its annotations?')) return;
-    try {
-      await deleteBook(id);
-      if (selectedBook?.id === id) setSelectedBook(null);
-      await refreshData();
-    } catch (err) {
-      alert('Failed to delete book');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Book',
+      message: 'Are you sure you want to delete this book and all its annotations? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await deleteBook(id);
+          if (selectedBook?.id === id) setSelectedBook(null);
+          await refreshData();
+        } catch (err) {
+          console.error('Failed to delete book:', err);
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   }
 
   // ===== Model Upload =====
   async function handleModelUpload(e) {
+    // ... rest of handleModelUpload implementation stays exactly the same
     const file = e.target.files?.[0];
     if (!file) return;
     const ext = file.name.toLowerCase().split('.').pop();
@@ -124,13 +141,20 @@ export default function AdminPage() {
   }
 
   async function handleDeleteModel(id) {
-    if (!confirm('Delete this 3D model?')) return;
-    try {
-      await deleteModel(id);
-      await refreshData();
-    } catch (err) {
-      alert('Failed to delete model');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Model',
+      message: 'Are you sure you want to delete this 3D model? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await deleteModel(id);
+          await refreshData();
+        } catch (err) {
+          console.error('Failed to delete model:', err);
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   }
 
   const tabStyle = (key) => ({
@@ -325,6 +349,15 @@ export default function AdminPage() {
           onCancel={() => setPendingThumbnail(null)}
         />
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

@@ -3,11 +3,20 @@ import { fetchBookPdf, fetchMappings, postMapping, deleteMapping, detectImages }
 import { Worker, Viewer, SpecialZoomLevel, ScrollMode } from '@react-pdf-viewer/core';
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/default-layout/lib/styles/index.css';
+import ConfirmationModal from './ConfirmationModal';
 
 export default function PdfAnnotator({ book, models }) {
   const [pageNumber, setPageNumber] = useState(1);
   const [numPages, setNumPages] = useState(null);
   const [pdfUrl, setPdfUrl] = useState(null);
+  
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
   // ...existing code...
   const [mappings, setMappings] = useState([]);
   const [selectedModel, setSelectedModel] = useState(models?.[0]?.id || null);
@@ -185,13 +194,26 @@ export default function PdfAnnotator({ book, models }) {
   }
 
   async function handleDelete(id) {
-    await deleteMapping(id);
-    const r = await fetchMappings(book.id, pageNumber);
-    const data = Array.isArray(r) ? r : (r?.data || r || []);
-    setMappings(data);
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Annotation',
+      message: 'Are you sure you want to delete this annotation mapping? This will remove the 3D model link from this PDF region.',
+      onConfirm: async () => {
+        try {
+          await deleteMapping(id);
+          const r = await fetchMappings(book.id, pageNumber);
+          const data = Array.isArray(r) ? r : (r?.data || r || []);
+          setMappings(data);
+        } catch (err) {
+          console.error('Failed to delete mapping:', err);
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   }
 
   function onDocumentLoadSuccess(e) {
+// ... existing code ...
     setNumPages(e.doc.numPages);
   }
 
@@ -203,6 +225,7 @@ export default function PdfAnnotator({ book, models }) {
   }
 
   const renderPage = useCallback((props) => {
+// ... rest of renderPage implementation stays exactly the same
     return (
       <>
         {props.canvasLayer.children}
@@ -309,6 +332,7 @@ export default function PdfAnnotator({ book, models }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* ... rest of the return implementation ... */}
       {/* Top Controls */}
       <div style={{ padding: '12px 16px', background: '#f5f5f5', borderBottom: '1px solid #ddd', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
@@ -495,6 +519,15 @@ export default function PdfAnnotator({ book, models }) {
           )}
         </aside>
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

@@ -8,10 +8,12 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../../constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../../constants/theme';
 import ModelModal from '../../components/Reading/ModelModal';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -19,6 +21,8 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 export default function ModelDetailModal({ visible, model, onClose }) {
   const [viewerVisible, setViewerVisible] = useState(false);
   const [authToken, setAuthToken] = useState(null);
+  const [isLiked, setIsLiked] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (visible) {
@@ -42,88 +46,81 @@ export default function ModelDetailModal({ visible, model, onClose }) {
       <View style={styles.overlay}>
         <TouchableOpacity style={styles.overlayTouch} activeOpacity={1} onPress={onClose} />
 
-        <View style={styles.modalContainer}>
-          {/* Drag Handle */}
-          <View style={styles.dragHandle} />
+        <View style={[styles.modalContainer, { paddingBottom: Math.max(insets.bottom, SPACING.lg) }]}>
+          {/* Header with Drag Handle and Close */}
+          <View style={styles.header}>
+            <View style={styles.dragHandle} />
+            <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
+              <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+          </View>
 
-          {/* Close Button */}
-          <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
-            <Ionicons name="close" size={24} color={COLORS.textLight} />
-          </TouchableOpacity>
-
-          <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-            {/* Model Preview */}
+          <ScrollView showsVerticalScrollIndicator={false} bounces={true}>
+            {/* Model Preview Image */}
             <View style={styles.previewContainer}>
               <Image source={{ uri: model.thumbnail }} style={styles.previewImage} resizeMode="cover" />
-              <View style={styles.previewOverlay}>
-                <View style={styles.badge3D}>
-                  <Ionicons name="cube-outline" size={18} color={COLORS.white} />
-                  <Text style={styles.badge3DText}>3D Model</Text>
-                </View>
+              <View style={styles.typeBadge}>
+                <Ionicons name="cube-outline" size={14} color={COLORS.white} />
+                <Text style={styles.typeBadgeText}>Interactive 3D</Text>
               </View>
             </View>
 
-            {/* Model Info Card */}
-            <View style={styles.infoCard}>
-              <Text style={styles.modelName}>{model.name}</Text>
-
-              <View style={styles.metaRow}>
-                <View style={styles.categoryBadge}>
-                  <Text style={styles.categoryBadgeText}>{model.category}</Text>
+            {/* Model Info Section */}
+            <View style={styles.contentSection}>
+              <View style={styles.titleRow}>
+                <View style={styles.titleInfo}>
+                  <Text style={styles.modelName}>{model.name}</Text>
+                  <Text style={styles.authorText}>by {model.uploadedBy}</Text>
                 </View>
-                <Text style={styles.uploadedBy}>by {model.uploadedBy}</Text>
+                <TouchableOpacity 
+                  style={[styles.likeButton, isLiked && styles.likeButtonActive]} 
+                  onPress={() => setIsLiked(!isLiked)}
+                >
+                  <Ionicons name={isLiked ? "heart" : "heart-outline"} size={24} color={isLiked ? COLORS.red : COLORS.navy} />
+                </TouchableOpacity>
               </View>
 
-              {/* View 3D Button */}
-              <TouchableOpacity style={styles.view3DButton} onPress={handleView3D} activeOpacity={0.8}>
-                <Ionicons name="cube" size={20} color={COLORS.white} />
-                <Text style={styles.view3DButtonText}>View in 3D</Text>
+              <View style={styles.metaBadges}>
+                <View style={styles.metaBadge}>
+                  <Text style={styles.metaBadgeText}>{model.category}</Text>
+                </View>
+                <View style={[styles.metaBadge, { backgroundColor: COLORS.orangeLight, borderColor: COLORS.orange }]}>
+                  <Text style={[styles.metaBadgeText, { color: COLORS.orange }]}>Medical</Text>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+
+              {/* View in 3D Primary Action */}
+              <TouchableOpacity style={styles.primaryActionButton} onPress={handleView3D} activeOpacity={0.8}>
+                <Ionicons name="cube" size={22} color={COLORS.white} />
+                <Text style={styles.primaryActionText}>View in 3D Space</Text>
               </TouchableOpacity>
 
-              {/* Action Row */}
-              <View style={styles.actionRow}>
-                <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
-                  <Ionicons name="heart-outline" size={20} color={COLORS.navy} />
-                  <Text style={styles.actionBtnText}>Like</Text>
+              {/* Secondary Actions */}
+              <View style={styles.actionGrid}>
+                <TouchableOpacity style={styles.secondaryAction}>
+                  <Ionicons name="share-social-outline" size={20} color={COLORS.navy} />
+                  <Text style={styles.secondaryActionText}>Share</Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
-                  <Ionicons name="share-outline" size={20} color={COLORS.navy} />
-                  <Text style={styles.actionBtnText}>Share</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
+                <TouchableOpacity style={styles.secondaryAction}>
                   <Ionicons name="download-outline" size={20} color={COLORS.navy} />
-                  <Text style={styles.actionBtnText}>Save</Text>
+                  <Text style={styles.secondaryActionText}>Download</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.secondaryAction}>
+                  <Ionicons name="bookmark-outline" size={20} color={COLORS.navy} />
+                  <Text style={styles.secondaryActionText}>Save</Text>
                 </TouchableOpacity>
               </View>
-            </View>
 
-            {/* Details Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Details</Text>
-
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Category</Text>
-                <Text style={styles.detailValue}>{model.category}</Text>
-              </View>
-
-              <View style={styles.detailDivider} />
-
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Uploaded By</Text>
-                <Text style={styles.detailValue}>{model.uploadedBy}</Text>
-              </View>
-
-              <View style={styles.detailDivider} />
-
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Format</Text>
-                <Text style={styles.detailValue}>.glb</Text>
+              {/* Details List */}
+              <View style={styles.detailsBox}>
+                <Text style={styles.sectionHeading}>Technical Details</Text>
+                <DetailItem label="File Format" value=".glb (glTF)" />
+                <DetailItem label="Dimensions" value="Unit Scale" />
+                <DetailItem label="Created" value={model.createdAt ? new Date(model.createdAt).toLocaleDateString() : 'N/A'} />
               </View>
             </View>
-
-            <View style={styles.bottomSpacing} />
           </ScrollView>
         </View>
       </View>
@@ -138,151 +135,184 @@ export default function ModelDetailModal({ visible, model, onClose }) {
   );
 }
 
+function DetailItem({ label, value }) {
+  return (
+    <View style={styles.detailItem}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailValue}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-end',
   },
   overlayTouch: { flex: 1 },
   modalContainer: {
     backgroundColor: COLORS.bgWhite,
-    borderTopLeftRadius: RADIUS.xxl,
-    borderTopRightRadius: RADIUS.xxl,
-    maxHeight: SCREEN_HEIGHT * 0.88,
-    paddingTop: SPACING.sm,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    maxHeight: SCREEN_HEIGHT * 0.9,
+    ...SHADOWS.medium,
+  },
+  header: {
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dragHandle: {
     width: 40,
-    height: 4,
+    height: 5,
     backgroundColor: COLORS.border,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: SPACING.xs,
+    borderRadius: 3,
   },
   closeButton: {
     position: 'absolute',
-    top: SPACING.sm,
-    right: SPACING.md,
-    zIndex: 10,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.borderLight,
-    justifyContent: 'center',
-    alignItems: 'center',
+    right: 20,
+    top: 5,
+    padding: 5,
   },
-
   previewContainer: {
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.sm,
-    borderRadius: RADIUS.xl,
-    overflow: 'hidden',
-    backgroundColor: COLORS.navyDeep,
-    height: 280,
+    width: '100%',
+    height: 260,
+    backgroundColor: COLORS.bgPrimary,
+    position: 'relative',
   },
   previewImage: {
     width: '100%',
     height: '100%',
   },
-  previewOverlay: {
+  typeBadge: {
     position: 'absolute',
-    top: SPACING.md,
-    left: SPACING.md,
-  },
-  badge3D: {
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(17, 26, 80, 0.8)',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xxs,
-    borderRadius: RADIUS.pill,
     gap: 6,
   },
-  badge3DText: {
+  typeBadgeText: {
     color: COLORS.white,
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
-    fontFamily: FONTS.regular,
   },
-
-  infoCard: {
-    backgroundColor: COLORS.white,
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.md,
-    borderRadius: RADIUS.xl,
+  contentSection: {
     padding: SPACING.xl,
   },
-  modelName: {
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '700',
-    color: COLORS.navy,
-    marginBottom: SPACING.sm,
-    lineHeight: 28,
-    fontFamily: FONTS.serifBold,
-  },
-  metaRow: {
+  titleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: SPACING.md,
   },
-  categoryBadge: {
-    backgroundColor: COLORS.bgAccent,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xxs,
-    borderRadius: RADIUS.lg,
+  titleInfo: {
+    flex: 1,
+  },
+  modelName: {
+    fontSize: FONT_SIZES.title,
+    fontWeight: '800',
+    color: COLORS.navy,
+    fontFamily: FONTS.serifBold,
+    marginBottom: 4,
+  },
+  authorText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    fontFamily: FONTS.regular,
+  },
+  likeButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.bgPrimary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  likeButtonActive: {
+    backgroundColor: '#FFF0F0',
+  },
+  metaBadges: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: SPACING.lg,
+  },
+  metaBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: COLORS.navy,
   },
-  categoryBadgeText: { fontSize: FONT_SIZES.xs, color: COLORS.navy, fontWeight: '600', fontFamily: FONTS.regular },
-  uploadedBy: { fontSize: FONT_SIZES.xs + 1, color: COLORS.textMuted, fontFamily: FONTS.regular },
-
-  view3DButton: {
+  metaBadgeText: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
+    color: COLORS.navy,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginBottom: SPACING.lg,
+  },
+  primaryActionButton: {
+    backgroundColor: COLORS.navy,
+    height: 56,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.navy,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.pill,
-    gap: SPACING.xs,
-    marginBottom: SPACING.sm,
+    gap: 12,
+    marginBottom: SPACING.xl,
+    ...SHADOWS.small,
   },
-  view3DButtonText: { color: COLORS.white, fontSize: FONT_SIZES.md, fontWeight: '600', fontFamily: FONTS.regular },
-
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    borderTopWidth: 1,
-    borderTopColor: COLORS.bgTertiary,
-    paddingTop: SPACING.sm,
-  },
-  actionBtn: { alignItems: 'center', gap: SPACING.xs },
-  actionBtnText: { fontSize: FONT_SIZES.xs, color: COLORS.navy, fontWeight: '600', fontFamily: FONTS.regular },
-
-  section: {
-    backgroundColor: COLORS.white,
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.sm,
-    borderRadius: RADIUS.xl,
-    padding: SPACING.xl,
-  },
-  sectionTitle: {
+  primaryActionText: {
+    color: COLORS.white,
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.md,
-    fontFamily: FONTS.serifBold,
   },
-  detailRow: {
+  actionGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: SPACING.xxs,
+    marginBottom: SPACING.xl,
   },
-  detailLabel: { fontSize: FONT_SIZES.sm, color: COLORS.textMuted, fontFamily: FONTS.regular },
-  detailValue: { fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, fontWeight: '600', fontFamily: FONTS.regular },
-  detailDivider: { height: 1, backgroundColor: COLORS.bgTertiary, marginVertical: SPACING.xxs },
-
-  bottomSpacing: { height: 40 },
+  secondaryAction: {
+    alignItems: 'center',
+    flex: 1,
+    gap: 6,
+  },
+  secondaryActionText: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+    color: COLORS.navy,
+  },
+  detailsBox: {
+    backgroundColor: COLORS.bgPrimary,
+    borderRadius: 16,
+    padding: SPACING.lg,
+  },
+  sectionHeading: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+    color: COLORS.navy,
+    marginBottom: SPACING.md,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  detailLabel: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+  },
+  detailValue: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '600',
+    color: COLORS.navy,
+  },
 });

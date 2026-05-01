@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Dimensions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { fetchModels } from '../../services/api';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
 import usePaginatedList from '../hooks/usePaginatedList';
@@ -66,13 +67,15 @@ export default function ModelsTab({ search = '', category = null }) {
 
   const renderModelItem = useCallback(({ item }) => (
     <TouchableOpacity style={styles.modelCard} onPress={() => handleModelPress(item)} activeOpacity={0.95}>
-      <Image source={{ uri: item.thumbnail }} style={styles.modelImage} resizeMode="cover" />
-      <View style={styles.modelInfo}>
-        <Text style={styles.modelName} numberOfLines={2}>{item.name}</Text>
-        <View style={styles.badgeRow}>
-          <Badge label={item.category} color={COLORS.navy} />
-          <Badge label="Medical" variant="outline" color={COLORS.orange} />
+      <View style={styles.imageContainer}>
+        <Image source={{ uri: item.thumbnail }} style={styles.modelImage} resizeMode="cover" />
+        <View style={styles.cardBadge}>
+          <Ionicons name="cube-outline" size={14} color={COLORS.white} />
         </View>
+      </View>
+      <View style={styles.modelInfo}>
+        <Text style={styles.modelName} numberOfLines={1}>{item.name}</Text>
+        <Text style={styles.modelCategory} numberOfLines={1}>{item.category}</Text>
       </View>
     </TouchableOpacity>
   ), [handleModelPress]);
@@ -109,22 +112,34 @@ export default function ModelsTab({ search = '', category = null }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bgPrimary },
-  listContent: { paddingTop: SPACING.md, paddingBottom: SPACING.xl },
+  listContent: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.xl },
 
   modelCard: {
     backgroundColor: COLORS.bgWhite,
-    marginHorizontal: SPACING.lg,
     marginBottom: SPACING.lg,
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.xl,
     overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: COLORS.navy,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     ...SHADOWS.small,
+  },
+  imageContainer: {
+    width: '100%',
+    height: 200,
+    backgroundColor: COLORS.navyDark,
+    position: 'relative',
   },
   modelImage: {
     width: '100%',
-    height: width - 32 - 20,
-    backgroundColor: COLORS.navyDark,
+    height: '100%',
+  },
+  cardBadge: {
+    position: 'absolute',
+    top: SPACING.md,
+    right: SPACING.md,
+    backgroundColor: 'rgba(17, 26, 80, 0.6)',
+    padding: 6,
+    borderRadius: 8,
   },
   modelInfo: {
     padding: SPACING.lg,
@@ -133,13 +148,13 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xl,
     fontWeight: '700',
     color: COLORS.navy,
-    marginBottom: SPACING.md,
-    lineHeight: 24,
+    marginBottom: 4,
     fontFamily: FONTS.serifBold,
   },
-  badgeRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
+  modelCategory: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    fontFamily: FONTS.regular,
   },
   footerLoader: {
     paddingVertical: SPACING.xl,
