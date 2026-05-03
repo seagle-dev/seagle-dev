@@ -13,7 +13,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { fetchMappings, fetchAllModels } from '../../services/api';
 
-export default function useAnnotations(bookId, currentPage) {
+export default function useAnnotations(bookId, currentPage, enabled = true) {
   const cacheRef = useRef(new Map());
   const [pageAnnotations, setPageAnnotations] = useState([]);
   const [models, setModels] = useState([]);
@@ -22,7 +22,7 @@ export default function useAnnotations(bookId, currentPage) {
 
   // Fetch the model catalog once when bookId changes
   useEffect(() => {
-    if (!bookId) return;
+    if (!enabled || !bookId) return;
     cacheRef.current = new Map();
 
     let cancelled = false;
@@ -42,11 +42,11 @@ export default function useAnnotations(bookId, currentPage) {
       });
 
     return () => { cancelled = true; };
-  }, [bookId]);
+  }, [bookId, enabled]);
 
   // Fetch annotations for the current page (with cache)
   useEffect(() => {
-    if (!bookId || !currentPage) {
+    if (!enabled || !bookId || !currentPage) {
       setPageAnnotations([]);
       return;
     }
@@ -78,7 +78,7 @@ export default function useAnnotations(bookId, currentPage) {
       });
 
     return () => { cancelled = true; };
-  }, [bookId, currentPage]);
+  }, [bookId, currentPage, enabled]);
 
   // Model lookup map: model_id → model object
   const modelMap = useMemo(() => {

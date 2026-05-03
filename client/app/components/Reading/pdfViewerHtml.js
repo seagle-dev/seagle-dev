@@ -15,6 +15,10 @@
  *   { type: 'error', message: '...' }
  */
 export default function getPdfViewerHtml(pdfUrl, authToken) {
+  const authHeaders = JSON.stringify(
+    authToken ? { Authorization: `Bearer ${authToken}` } : {},
+  );
+
   return `
 <!DOCTYPE html>
 <html>
@@ -292,7 +296,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
 
       if (!modelBlobPromiseCache.has(ann.modelUrl)) {
         const fetchPromise = fetch(ann.modelUrl, {
-          headers: ${authToken ? `{ 'Authorization': 'Bearer ${authToken}' }` : '{}'}
+          headers: ${authHeaders}
         })
           .then((response) => {
             if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -509,7 +513,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
 
         // Fetch the PDF with auth
         const response = await fetch('${pdfUrl}', {
-          headers: ${authToken ? `{ 'Authorization': 'Bearer ${authToken}' }` : '{}'}
+          headers: ${authHeaders}
         });
         console.log('[pdfViewerHtml] fetch status:', response.status, response.statusText);
         if (!response.ok) throw new Error('HTTP ' + response.status);

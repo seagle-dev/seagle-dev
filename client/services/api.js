@@ -1,11 +1,42 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-// Android emulator uses 10.0.2.2 to reach host machine's localhost
-const DEFAULT_BASE = Platform.OS === 'android'
-  ? 'http://10.0.2.2:5000/api'
-  : 'http://localhost:5000/api';
+const API_PORT = process.env.EXPO_PUBLIC_API_PORT || '5000';
+const API_PATH = '/api';
+
+function getExpoHost() {
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    Constants.manifest2?.extra?.expoClient?.hostUri ||
+    Constants.manifest?.debuggerHost;
+
+  if (!hostUri) return null;
+
+  return hostUri
+    .replace(/^https?:\/\//, '')
+    .replace(/^exp:\/\//, '')
+    .split('/')[0]
+    .split(':')[0];
+}
+
+function getApiBaseUrl() {
+  if (process.env.EXPO_PUBLIC_API_BASE_URL) {
+    return process.env.EXPO_PUBLIC_API_BASE_URL.replace(/\/$/, '');
+  }
+
+  const expoHost = getExpoHost();
+  if (expoHost && expoHost !== 'localhost' && expoHost !== '127.0.0.1') {
+    return `http://${expoHost}:${API_PORT}${API_PATH}`;
+  }
+
+  // Android emulator uses 10.0.2.2 to reach the host machine's localhost.
+  const fallbackHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+  return `http://${fallbackHost}:${API_PORT}${API_PATH}`;
+}
+
+const DEFAULT_BASE = getApiBaseUrl();
 
 export const api = axios.create({
   baseURL: DEFAULT_BASE,
@@ -25,15 +56,17 @@ api.interceptors.request.use(async (config) => {
 // ==================== TOKEN HELPERS ====================
 
 export async function setToken(token) {
-  if (token) {
-    await AsyncStorage.setItem('token', token);
+  const normalizedToken = typeof token === 'string' ? token.trim() : token;
+  if (normalizedToken) {
+    await AsyncStorage.setItem('token', normalizedToken);
   } else {
     await AsyncStorage.removeItem('token');
   }
 }
 
 export async function getToken() {
-  return AsyncStorage.getItem('token');
+  const token = await AsyncStorage.getItem('token');
+  return typeof token === 'string' ? token.trim() : token;
 }
 
 export async function clearAuth() {
@@ -94,14 +127,28 @@ export async function fetchAllModels() {
 }
 
 export async function fetchMappings(bookId, page) {
-  const res = await api.get('/library/mappings', { params: { book_id: bookId, page } });
+  let res;
+  try {
+    res = await api.get('/library/mappings', { params: { book_id: bookId, page } });
+  } catch (err) {
+    if (err?.response?.status !== 401) throw err;
+    await refreshToken();
+    res = await api.get('/library/mappings', { params: { book_id: bookId, page } });
+  }
   return res.data.data || res.data;
 }
 
 // ==================== HOME (auth required) ====================
 
 export async function fetchHome() {
-  const res = await api.get('/home');
+  let res;
+  try {
+    res = await api.get('/home');
+  } catch (err) {
+    if (err?.response?.status !== 401) throw err;
+    await refreshToken();
+    res = await api.get('/home');
+  }
   return res.data; // { recentlyRead: [...], trending: [...] }
 }
 

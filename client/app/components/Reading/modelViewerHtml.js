@@ -13,6 +13,9 @@
 export default function getModelViewerHtml(modelUrl, authToken, initialViewState = null) {
   console.log('[getModelViewerHtml] Called with initialViewState:', initialViewState);
   const viewStateStr = initialViewState ? JSON.stringify(initialViewState) : 'null';
+  const authHeaders = JSON.stringify(
+    authToken ? { Authorization: `Bearer ${authToken}` } : {},
+  );
   console.log('[getModelViewerHtml] Stringified viewState:', viewStateStr);
   
   return `
@@ -210,7 +213,7 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
       try {
         console.log('[modelViewerHtml] Starting model load from:', '${modelUrl}');
         const resp = await fetch('${modelUrl}', {
-          headers: ${authToken ? `{ 'Authorization': 'Bearer ${authToken}' }` : '{}'}
+          headers: ${authHeaders}
         });
         console.log('[modelViewerHtml] Fetch response status:', resp.status);
         

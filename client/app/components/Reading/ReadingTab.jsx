@@ -21,10 +21,14 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../../constants/theme';
-import { getBookPdfUrl } from '../../../services/api';
+import {
+  clearAuth,
+  getBookPdfUrl,
+  getToken,
+  refreshToken,
+} from '../../../services/api';
 import useAnnotations from '../../hooks/useAnnotations';
 import PdfViewer from './PdfViewer';
 import ModelModal from './ModelModal';
@@ -33,6 +37,8 @@ export default function ReadingTab({ book }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(null);
   const [authToken, setAuthToken] = useState(null);
+  const [authError, setAuthError] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [selectedAnnotation, setSelectedAnnotation] = useState(null);
 
   const bookId = book?.id;
@@ -45,13 +51,44 @@ export default function ReadingTab({ book }) {
   }, [book, bookId, pdfUrl]);
 
   // Fetch annotations for the current page
-  const { annotations, loading: annotLoading } = useAnnotations(bookId, currentPage);
+  const { annotations, loading: annotLoading } = useAnnotations(
+    bookId,
+    currentPage,
+    !!authToken,
+  );
 
-  // Load auth token on mount
+  // Load and validate auth token before protected reader requests start.
   useEffect(() => {
-    AsyncStorage.getItem('token').then((t) => {
-      if (t) setAuthToken(t);
-    });
+    let cancelled = false;
+
+    async function loadAuthToken() {
+      setAuthLoading(true);
+      setAuthError(null);
+
+      try {
+        const token = await getToken();
+        if (!token) {
+          throw new Error('No saved session');
+        }
+
+        // refreshToken verifies the current token and returns a fresh one.
+        // Avoid /auth/profile here because older/running backends may not expose it.
+        const newToken = await refreshToken();
+        if (!cancelled) setAuthToken(newToken);
+      } catch (err) {
+        console.warn('[ReadingTab] auth validation failed:', err.message);
+        await clearAuth();
+        if (!cancelled) {
+          setAuthToken(null);
+          setAuthError('Your session expired. Please log in again.');
+        }
+      } finally {
+        if (!cancelled) setAuthLoading(false);
+      }
+    }
+
+    loadAuthToken();
+    return () => { cancelled = true; };
   }, []);
 
   // Reset page when book changes
@@ -101,11 +138,20 @@ export default function ReadingTab({ book }) {
     );
   }
 
-  if (!authToken) {
+  if (authLoading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={COLORS.navy} />
         <Text style={styles.loadingText}>Authenticating…</Text>
+      </View>
+    );
+  }
+
+  if (!authToken) {
+    return (
+      <View style={styles.centered}>
+        <Ionicons name="lock-closed-outline" size={48} color={COLORS.textMuted} />
+        <Text style={styles.emptyText}>{authError || 'Please log in to read this book.'}</Text>
       </View>
     );
   }

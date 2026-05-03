@@ -189,3 +189,28 @@ exports.refreshToken = (req, res) => {
     return res.status(401).json({ message: 'Invalid token' });
   }
 };
+
+exports.profile = async (req, res) => {
+  try {
+    const [rows] = await db.execute(
+      'SELECT id, email, role FROM users WHERE id = ? LIMIT 1',
+      [req.user.id],
+    );
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const user = rows[0];
+    return res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error('auth.profile error', err);
+    return res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
