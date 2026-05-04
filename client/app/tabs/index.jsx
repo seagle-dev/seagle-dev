@@ -1,7 +1,7 @@
 // app/tabs/index.jsx
 import React from 'react';
-import BookListing from '../components/BookListing';
+import { Redirect } from 'expo-router';
 
 export default function TabsHome() {
-  return <BookListing />;
+  return <Redirect href="/tabs/library" />;
 }

@@ -42,7 +42,7 @@ export default function Index() {
   }
 
   // Once ready, redirect
-  return hasUser ? <Redirect href="/tabs" /> : <Redirect href="/auth/Auth" />;
+  return hasUser ? <Redirect href="/tabs/library" /> : <Redirect href="/auth/Auth" />;
 }
 
 const styles = StyleSheet.create({

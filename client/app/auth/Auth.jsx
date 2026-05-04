@@ -35,7 +35,7 @@ export default function Auth() {
     try {
       const data = await login(email, password)
       await signIn(data.user, data.token)
-      router.replace('/tabs')
+      router.replace('/tabs/library')
     } catch (err) {
       Alert.alert('Login Failed', err.message || 'Invalid credentials')
     } finally {
