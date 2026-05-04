@@ -5,6 +5,9 @@ import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/default-layout/lib/styles/index.css';
 import ConfirmationModal from './ConfirmationModal';
 
+const MIN_DETECTION_SIZE = 0.02;
+const RESIZE_HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+
 export default function PdfAnnotator({ book, models }) {
   const [pageNumber, setPageNumber] = useState(1);
   const [numPages, setNumPages] = useState(null);
@@ -30,27 +33,35 @@ export default function PdfAnnotator({ book, models }) {
   const [isDrawing, setIsDrawing] = useState(false);
   const [annotationBox, setAnnotationBox] = useState(null);
   const startRef = useRef(null);
+  const detectionEditRef = useRef(null);
   const [mode, setMode] = useState('auto');
 
   useEffect(() => {
+    let activeBlobUrl = null;
+    let isActive = true;
+
     setPageNumber(1);
-    // Clean up previous blob URL
-    if (pdfUrl && pdfUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(pdfUrl);
-    }
-    setPdfUrl(null);
+    setPdfUrl((currentUrl) => {
+      if (currentUrl && currentUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(currentUrl);
+      }
+      return null;
+    });
 
     fetchBookPdf(book.id)
-      .then((r) => setPdfUrl(r.pdfUrl))
+      .then((r) => {
+        activeBlobUrl = r.pdfUrl;
+        if (isActive) setPdfUrl(r.pdfUrl);
+      })
       .catch((err) => console.error('fetchBookPdf error:', err));
 
-    // Cleanup on unmount
     return () => {
-      if (pdfUrl && pdfUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(pdfUrl);
+      isActive = false;
+      if (activeBlobUrl && activeBlobUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(activeBlobUrl);
       }
     };
-  }, [book]);
+  }, [book.id]);
 
   // ...existing code... (rest of the component stays exactly the same)
   useEffect(() => {
@@ -76,7 +87,10 @@ export default function PdfAnnotator({ book, models }) {
     setDetecting(true);
     try {
       const result = await detectImages(book.id, pageNumber);
-      const images = result?.images || [];
+      const images = (result?.images || []).map((image, index) => ({
+        ...image,
+        id: image.id ?? `det-${pageNumber}-${index}`,
+      }));
       console.log('Detected images:', images);
       setDetectedImages(images);
     } catch (err) {
@@ -120,6 +134,100 @@ export default function PdfAnnotator({ book, models }) {
   }
 
   function clamp(v) { return Math.max(0, Math.min(1, v)); }
+
+  const selectDetection = useCallback((detection) => {
+    setSelectedDetection(detection);
+    setAssignModel(selectedModel);
+  }, [selectedModel]);
+
+  const updateDetection = useCallback((detectionId, nextDetection) => {
+    setDetectedImages(prev => prev.map((det) => (
+      det.id === detectionId ? { ...det, ...nextDetection } : det
+    )));
+    setSelectedDetection(prev => (
+      prev?.id === detectionId ? { ...prev, ...nextDetection } : prev
+    ));
+  }, []);
+
+  const handleDetectionEditMove = useCallback((e) => {
+    const edit = detectionEditRef.current;
+    if (!edit) return;
+
+    const dx = (e.clientX - edit.startX) / edit.pageRect.width;
+    const dy = (e.clientY - edit.startY) / edit.pageRect.height;
+    const original = edit.original;
+    let next = { ...original };
+
+    if (edit.action === 'move') {
+      next.x = Math.min(clamp(original.x + dx), 1 - original.width);
+      next.y = Math.min(clamp(original.y + dy), 1 - original.height);
+    } else {
+      const right = original.x + original.width;
+      const bottom = original.y + original.height;
+      let left = original.x;
+      let top = original.y;
+      let nextRight = right;
+      let nextBottom = bottom;
+
+      if (edit.action.includes('w')) left = clamp(original.x + dx);
+      if (edit.action.includes('e')) nextRight = clamp(right + dx);
+      if (edit.action.includes('n')) top = clamp(original.y + dy);
+      if (edit.action.includes('s')) nextBottom = clamp(bottom + dy);
+
+      if (nextRight - left < MIN_DETECTION_SIZE) {
+        if (edit.action.includes('w')) left = nextRight - MIN_DETECTION_SIZE;
+        else nextRight = left + MIN_DETECTION_SIZE;
+      }
+      if (nextBottom - top < MIN_DETECTION_SIZE) {
+        if (edit.action.includes('n')) top = nextBottom - MIN_DETECTION_SIZE;
+        else nextBottom = top + MIN_DETECTION_SIZE;
+      }
+
+      left = clamp(left);
+      top = clamp(top);
+      nextRight = clamp(nextRight);
+      nextBottom = clamp(nextBottom);
+
+      next = {
+        ...next,
+        x: left,
+        y: top,
+        width: Math.max(MIN_DETECTION_SIZE, nextRight - left),
+        height: Math.max(MIN_DETECTION_SIZE, nextBottom - top),
+      };
+    }
+
+    updateDetection(edit.detectionId, next);
+  }, [updateDetection]);
+
+  const endDetectionEdit = useCallback(() => {
+    detectionEditRef.current = null;
+    window.removeEventListener('pointermove', handleDetectionEditMove);
+    window.removeEventListener('pointerup', endDetectionEdit);
+  }, [handleDetectionEditMove]);
+
+  const beginDetectionEdit = useCallback((e, detection, action) => {
+    e.preventDefault();
+    e.stopPropagation();
+    selectDetection(detection);
+
+    const pageLayer = e.currentTarget.closest('[data-detection-layer="true"]');
+    if (!pageLayer) return;
+
+    detectionEditRef.current = {
+      action,
+      detectionId: detection.id,
+      original: detection,
+      pageRect: pageLayer.getBoundingClientRect(),
+      startX: e.clientX,
+      startY: e.clientY,
+    };
+
+    window.addEventListener('pointermove', handleDetectionEditMove);
+    window.addEventListener('pointerup', endDetectionEdit);
+  }, [endDetectionEdit, handleDetectionEditMove, selectDetection]);
+
+  useEffect(() => () => endDetectionEdit(), [endDetectionEdit]);
 
   function getPdfPageLayer() {
     if (!containerRef.current) return null;
@@ -193,7 +301,7 @@ export default function PdfAnnotator({ book, models }) {
     setAnnotationBox(null);
   }
 
-  async function handleDelete(id) {
+  const handleDelete = useCallback((id) => {
     setConfirmModal({
       isOpen: true,
       title: 'Delete Annotation',
@@ -210,7 +318,7 @@ export default function PdfAnnotator({ book, models }) {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
-  }
+  }, [book.id, pageNumber]);
 
   function onDocumentLoadSuccess(e) {
 // ... existing code ...
@@ -233,11 +341,12 @@ export default function PdfAnnotator({ book, models }) {
         {props.annotationLayer.children}
 
         {detectedImages.length > 0 && (
-          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 5 }}>
+          <div data-detection-layer="true" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 5 }}>
             {detectedImages.map((det) => (
               <div
                 key={det.id}
-                onClick={(e) => { e.stopPropagation(); setSelectedDetection(det); setAssignModel(selectedModel); }}
+                onClick={(e) => { e.stopPropagation(); selectDetection(det); }}
+                onPointerDown={(e) => beginDetectionEdit(e, det, 'move')}
                 style={{
                   position: 'absolute',
                   left: `${det.x * 100}%`,
@@ -248,12 +357,41 @@ export default function PdfAnnotator({ book, models }) {
                   background: selectedDetection?.id === det.id ? 'rgba(255, 102, 0, 0.15)' : 'rgba(0, 204, 68, 0.1)',
                   borderRadius: '4px',
                   pointerEvents: 'auto',
-                  cursor: 'pointer',
+                  cursor: selectedDetection?.id === det.id ? 'move' : 'pointer',
                   zIndex: 10,
-                  transition: 'all 0.2s',
+                  transition: detectionEditRef.current ? 'none' : 'all 0.2s',
                 }}
                 title={det.figureLabel ? `${det.figureLabel}: ${det.figureTitle || ''}` : 'Detected image — click to assign model'}
               >
+                {selectedDetection?.id === det.id && RESIZE_HANDLES.map((handle) => {
+                  const isNorth = handle.includes('n');
+                  const isSouth = handle.includes('s');
+                  const isWest = handle.includes('w');
+                  const isEast = handle.includes('e');
+
+                  return (
+                    <span
+                      key={handle}
+                      onPointerDown={(e) => beginDetectionEdit(e, det, handle)}
+                      style={{
+                        position: 'absolute',
+                        width: handle === 'n' || handle === 's' ? '26px' : '10px',
+                        height: handle === 'e' || handle === 'w' ? '26px' : '10px',
+                        left: isWest ? '-6px' : isEast ? 'auto' : '50%',
+                        right: isEast ? '-6px' : 'auto',
+                        top: isNorth ? '-6px' : isSouth ? 'auto' : '50%',
+                        bottom: isSouth ? '-6px' : 'auto',
+                        transform: !isWest && !isEast ? 'translateX(-50%)' : !isNorth && !isSouth ? 'translateY(-50%)' : 'none',
+                        background: '#fff',
+                        border: '2px solid #ff6600',
+                        borderRadius: '999px',
+                        boxSizing: 'border-box',
+                        cursor: `${handle}-resize`,
+                        zIndex: 20,
+                      }}
+                    />
+                  );
+                })}
                 {det.figureLabel && (
                   <span style={{
                     position: 'absolute',
@@ -328,7 +466,7 @@ export default function PdfAnnotator({ book, models }) {
         )}
       </>
     );
-  }, [detectedImages, mappings, selectedDetection, selectedModel]);
+  }, [detectedImages, mappings, selectedDetection, beginDetectionEdit, selectDetection, handleDelete]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -483,7 +621,7 @@ export default function PdfAnnotator({ book, models }) {
               <p style={{ fontSize: '11px', color: '#999', marginBottom: '8px' }}>Click an image region on the PDF or below to assign a 3D model</p>
               {detectedImages.map((det) => (
                 <div key={det.id}
-                  onClick={() => { setSelectedDetection(det); setAssignModel(selectedModel); }}
+                  onClick={() => selectDetection(det)}
                   style={{
                     padding: '8px', background: selectedDetection?.id === det.id ? '#fff3cd' : '#fff',
                     border: selectedDetection?.id === det.id ? '2px solid #ffc107' : '1px solid #ddd',
