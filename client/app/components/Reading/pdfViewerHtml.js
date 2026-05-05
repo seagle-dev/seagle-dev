@@ -26,26 +26,45 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #f0ece4; }
-    #page-container {
+    html, body { width: 100%; min-height: 100%; background: #f0ece4; font-family: -apple-system, sans-serif; }
+    #viewer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 0;
+      gap: 15px;
+    }
+    .page-container {
       position: relative;
-      width: 100%;
-      height: 100%;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      margin-bottom: 5px;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
     }
-    canvas {
+    .page-canvas {
       display: block;
-      max-width: 100%;
-      max-height: 100%;
+      width: 100%;
+      height: 100%;
     }
-    #annotations-layer {
+    .annotations-layer {
       position: absolute;
       top: 0; left: 0;
+      width: 100%; height: 100%;
       pointer-events: none;
     }
     .hotspot {
@@ -140,20 +159,19 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       justify-content: center;
       background: #d9d9d9;
       color: #666;
-      font-family: -apple-system, sans-serif;
       font-size: 11px;
       text-align: center;
       padding: 4px;
     }
     #loading-overlay {
-      position: absolute;
+      position: fixed;
       inset: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       background: #f0ece4;
-      font-family: -apple-system, sans-serif;
+      z-index: 1000;
       color: #888;
       font-size: 14px;
     }
@@ -166,58 +184,60 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       margin-bottom: 12px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    .page-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ccc;
+      font-size: 12px;
+    }
   </style>
 </head>
 <body>
-  <div id="page-container">
-    <canvas id="pdf-canvas"></canvas>
-    <div id="annotations-layer"></div>
-    <div id="loading-overlay"><div class="spinner"></div>Loading PDF…</div>
-  </div>
+  <div id="viewer"></div>
+  <div id="loading-overlay"><div class="spinner"></div>Loading PDF…</div>
 
   <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-    import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
-    import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     window.__INLINE_THREE__ = { THREE, OrbitControls, GLTFLoader };
   </script>
 
   <script>
     // ---- State ----
     let pdfDoc = null;
-    let currentPage = 1;
     let totalPages = 0;
-    let currentAnnotations = [];
-    let rendering = false;
+    let currentAnnotationsMap = new Map(); // pageNum -> annotations[]
+    const pageRenderState = new Map(); // pageNum -> { rendering: bool, rendered: bool }
     const inlineViewers = [];
     let threeRuntimePromise = null;
     let legacyRuntimePromise = null;
     const modelBlobUrlCache = new Map();
     const modelBlobPromiseCache = new Map();
 
-    const canvas = document.getElementById('pdf-canvas');
-    const ctx = canvas.getContext('2d');
-    const container = document.getElementById('page-container');
-    const annotLayer = document.getElementById('annotations-layer');
+    const viewerContainer = document.getElementById('viewer');
     const loadingOverlay = document.getElementById('loading-overlay');
 
     function sendMessage(data) {
       if (window.ReactNativeWebView) {
         window.ReactNativeWebView.postMessage(JSON.stringify(data));
+      } else {
+        window.parent.postMessage(JSON.stringify(data), '*');
       }
     }
 
     function clearInlineViewers() {
       inlineViewers.forEach((cleanup) => {
-        try {
-          cleanup();
-        } catch (e) {
-          console.warn('[pdfViewerHtml] inline viewer cleanup error', e?.message || e);
-        }
+        try { cleanup(); } catch (e) { }
       });
       inlineViewers.length = 0;
     }
 
+    // (Same THREE runtime loading functions as before...)
     function loadScript(url) {
       return new Promise((resolve, reject) => {
         const script = document.createElement('script');
@@ -232,26 +252,12 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
     function loadLegacyThreeRuntime() {
       if (!legacyRuntimePromise) {
         legacyRuntimePromise = (async () => {
-          if (!window.THREE) {
-            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js');
-          }
-
-          if (!window.THREE?.OrbitControls && !window.OrbitControls) {
-            await loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js');
-          }
-
-          if (!window.THREE?.GLTFLoader && !window.GLTFLoader) {
-            await loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js');
-          }
-
+          if (!window.THREE) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js');
+          if (!window.THREE?.OrbitControls && !window.OrbitControls) await loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js');
+          if (!window.THREE?.GLTFLoader && !window.GLTFLoader) await loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js');
           const THREE = window.THREE;
           const OrbitControls = window.THREE?.OrbitControls || window.OrbitControls;
           const GLTFLoader = window.THREE?.GLTFLoader || window.GLTFLoader;
-
-          if (!THREE || !OrbitControls || !GLTFLoader) {
-            throw new Error('legacy three runtime incomplete');
-          }
-
           return { THREE, OrbitControls, GLTFLoader };
         })();
       }
@@ -261,27 +267,13 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
     function loadThreeRuntime() {
       if (!threeRuntimePromise) {
         threeRuntimePromise = new Promise((resolve, reject) => {
-          const maxAttempts = 50;
           let attempts = 0;
-
-          const checkRuntime = () => {
-            attempts += 1;
-            if (window.__INLINE_THREE__) {
-              resolve(window.__INLINE_THREE__);
-              return;
-            }
-            if (attempts >= maxAttempts) {
-              loadLegacyThreeRuntime()
-                .then(resolve)
-                .catch((legacyErr) => {
-                  reject(new Error('three runtime unavailable: ' + (legacyErr?.message || legacyErr)));
-                });
-              return;
-            }
-            setTimeout(checkRuntime, 100);
+          const check = () => {
+            if (window.__INLINE_THREE__) { resolve(window.__INLINE_THREE__); return; }
+            if (attempts++ > 50) { loadLegacyThreeRuntime().then(resolve).catch(reject); return; }
+            setTimeout(check, 100);
           };
-
-          checkRuntime();
+          check();
         });
       }
       return threeRuntimePromise;
@@ -289,306 +281,176 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
 
     async function getModelBlobUrl(ann) {
       if (!ann?.modelUrl) throw new Error('missing model URL');
-
-      if (modelBlobUrlCache.has(ann.modelUrl)) {
-        return modelBlobUrlCache.get(ann.modelUrl);
-      }
-
+      if (modelBlobUrlCache.has(ann.modelUrl)) return modelBlobUrlCache.get(ann.modelUrl);
       if (!modelBlobPromiseCache.has(ann.modelUrl)) {
-        const fetchPromise = fetch(ann.modelUrl, {
-          headers: ${authHeaders}
-        })
-          .then((response) => {
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            return response.blob();
-          })
-          .then((blob) => {
-            const blobUrl = URL.createObjectURL(blob);
-            modelBlobUrlCache.set(ann.modelUrl, blobUrl);
-            modelBlobPromiseCache.delete(ann.modelUrl);
-            return blobUrl;
-          })
-          .catch((err) => {
-            modelBlobPromiseCache.delete(ann.modelUrl);
-            throw err;
-          });
-
-        modelBlobPromiseCache.set(ann.modelUrl, fetchPromise);
+        modelBlobPromiseCache.set(ann.modelUrl, fetch(ann.modelUrl, { headers: ${authHeaders} })
+          .then(r => r.blob()).then(b => {
+            const url = URL.createObjectURL(b);
+            modelBlobUrlCache.set(ann.modelUrl, url);
+            return url;
+          }));
       }
-
       return modelBlobPromiseCache.get(ann.modelUrl);
     }
 
     async function initInlineModelViewer(rootEl, ann) {
-      if (!ann.modelUrl) {
-        const fb = document.createElement('div');
-        fb.className = 'hotspot-fallback';
-        fb.textContent = '3D unavailable';
-        rootEl.appendChild(fb);
-        return;
-      }
-
       let runtime;
-      try {
-        runtime = await loadThreeRuntime();
-      } catch (err) {
-        const reason = err?.message || String(err);
-        console.warn('[pdfViewerHtml] three runtime load failed:', reason);
-        const fb = document.createElement('div');
-        fb.className = 'hotspot-fallback';
-        fb.textContent = '3D loader failed: ' + reason;
-        rootEl.appendChild(fb);
-        return;
-      }
-
+      try { runtime = await loadThreeRuntime(); } catch (e) { return; }
       const { THREE, OrbitControls, GLTFLoader } = runtime;
-
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setSize(rootEl.clientWidth || 200, rootEl.clientHeight || 140);
+      renderer.setSize(rootEl.clientWidth, rootEl.clientHeight);
       rootEl.appendChild(renderer.domElement);
-
       const scene = new THREE.Scene();
       scene.background = new THREE.Color(0xe0e0e0);
-
-      const camera = new THREE.PerspectiveCamera(
-        45,
-        (rootEl.clientWidth || 1) / (rootEl.clientHeight || 1),
-        0.01,
-        100
-      );
+      const camera = new THREE.PerspectiveCamera(45, rootEl.clientWidth / rootEl.clientHeight, 0.01, 100);
       camera.position.set(0, 0, 4);
-
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
-      controls.dampingFactor = 0.08;
-      controls.minDistance = 0.5;
-      controls.maxDistance = 20;
-
       scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-      const key = new THREE.DirectionalLight(0xffffff, 0.9);
-      key.position.set(5, 8, 6);
-      scene.add(key);
-
-      let raf = null;
-      let stopped = false;
-
-      const resize = () => {
-        if (stopped) return;
-        const w = Math.max(rootEl.clientWidth, 1);
-        const h = Math.max(rootEl.clientHeight, 1);
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-        renderer.setSize(w, h);
-      };
-
-      const animate = () => {
-        if (stopped) return;
-        controls.update();
-        renderer.render(scene, camera);
-        raf = requestAnimationFrame(animate);
-      };
-
-      const applySavedViewState = (state) => {
-        if (!state) return false;
-        const cp = state.cameraPosition;
-        const ct = state.controlsTarget;
-        const fov = state.fov;
-        const isNumber = (v) => typeof v === 'number' && Number.isFinite(v);
-
-        if (!cp || !ct) return false;
-        if (!isNumber(cp.x) || !isNumber(cp.y) || !isNumber(cp.z)) return false;
-        if (!isNumber(ct.x) || !isNumber(ct.y) || !isNumber(ct.z)) return false;
-
-        if (isNumber(fov)) {
-          camera.fov = fov;
-          camera.updateProjectionMatrix();
-        }
-
-        controls.target.set(ct.x, ct.y, ct.z);
-        camera.position.set(cp.x, cp.y, cp.z);
-        camera.lookAt(controls.target);
-        controls.update();
-        return true;
-      };
-
+      const light = new THREE.DirectionalLight(0xffffff, 0.9);
+      light.position.set(5, 8, 6);
+      scene.add(light);
+      let stopped = false, raf;
+      const animate = () => { if (!stopped) { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(animate); } };
       const loader = new GLTFLoader();
-
-      getModelBlobUrl(ann)
-        .then((modelBlobUrl) => {
-          loader.load(
-            modelBlobUrl,
-            (gltf) => {
-              const model = gltf.scene;
-
-              // Match web transform pipeline: center -> pivot scale -> floor align.
-              const box = new THREE.Box3().setFromObject(model);
-              const center = box.getCenter(new THREE.Vector3());
-              const boxSize = box.getSize(new THREE.Vector3());
-              const maxDim = Math.max(boxSize.x, boxSize.y, boxSize.z) || 1;
-
-              model.position.set(-center.x, -center.y, -center.z);
-              const pivot = new THREE.Group();
-              pivot.add(model);
-              const scale = 2 / maxDim;
-              pivot.scale.setScalar(scale);
-
-              const scaledBox = new THREE.Box3().setFromObject(pivot);
-              pivot.position.y -= scaledBox.min.y;
-              scene.add(pivot);
-
-              const finalBox = new THREE.Box3().setFromObject(pivot);
-              const finalCenter = finalBox.getCenter(new THREE.Vector3());
-
-              const usedSaved = applySavedViewState(ann.view_state);
-              if (!usedSaved) {
-                const finalSize = finalBox.getSize(new THREE.Vector3());
-                const fov = camera.fov * (Math.PI / 180);
-                const dist = (Math.max(finalSize.x, finalSize.y, finalSize.z) / 2) / Math.tan(fov / 2) * 1.5;
-
-                controls.target.copy(finalCenter);
-                camera.position.set(
-                  finalCenter.x + dist * 0.4,
-                  finalCenter.y + dist * 0.3,
-                  finalCenter.z + dist
-                );
-                camera.lookAt(finalCenter);
-                controls.update();
-              }
-
-              resize();
-              animate();
-            },
-            undefined,
-            () => {
-              throw new Error('GLTF parse failed');
-            }
-          );
-        })
-        .catch((err) => {
-          console.warn('[pdfViewerHtml] inline model failed:', err.message);
-          const fb = document.createElement('div');
-          fb.className = 'hotspot-fallback';
-          fb.textContent = ann.thumbnailUrl ? 'Preview only' : '3D failed';
-          rootEl.appendChild(fb);
-
-          if (ann.thumbnailUrl) {
-            const img = document.createElement('img');
-            img.src = ann.thumbnailUrl;
-            img.alt = ann.displayName || '3D preview';
-            img.style.position = 'absolute';
-            img.style.inset = '0';
-            img.style.width = '100%';
-            img.style.height = '100%';
-            img.style.objectFit = 'cover';
-            img.style.zIndex = '1';
-            rootEl.appendChild(img);
-          }
+      getModelBlobUrl(ann).then(url => {
+        loader.load(url, gltf => {
+          const model = gltf.scene;
+          const box = new THREE.Box3().setFromObject(model);
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+          const maxDim = Math.max(size.x, size.y, size.z) || 1;
+          model.position.set(-center.x, -center.y, -center.z);
+          const pivot = new THREE.Group(); pivot.add(model);
+          pivot.scale.setScalar(2 / maxDim);
+          scene.add(pivot);
+          animate();
         });
-
-      const onResize = () => resize();
-      window.addEventListener('resize', onResize);
-
-      inlineViewers.push(() => {
-        stopped = true;
-        if (raf) cancelAnimationFrame(raf);
-        window.removeEventListener('resize', onResize);
-        controls.dispose();
-        renderer.dispose();
-        if (renderer.domElement && renderer.domElement.parentNode) {
-          renderer.domElement.parentNode.removeChild(renderer.domElement);
-        }
       });
+      inlineViewers.push(() => { stopped = true; cancelAnimationFrame(raf); controls.dispose(); renderer.dispose(); });
     }
 
     // ---- PDF Loading ----
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     async function loadPdf() {
       try {
-        // Debug: log the exact PDF URL and auth state used inside the WebView.
-        console.log('[pdfViewerHtml] loading pdfUrl:', '${pdfUrl}');
-        console.log('[pdfViewerHtml] auth token present:', ${authToken ? 'true' : 'false'});
-
-        // Fetch the PDF with auth
-        const response = await fetch('${pdfUrl}', {
-          headers: ${authHeaders}
-        });
-        console.log('[pdfViewerHtml] fetch status:', response.status, response.statusText);
+        const response = await fetch('${pdfUrl}', { headers: ${authHeaders} });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         const arrayBuffer = await response.arrayBuffer();
-
-        console.log('[pdfViewerHtml] pdf bytes received:', arrayBuffer.byteLength);
-
         pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         totalPages = pdfDoc.numPages;
-
-        console.log('[pdfViewerHtml] pdf loaded, totalPages:', totalPages);
-
         loadingOverlay.style.display = 'none';
-        renderPage(currentPage);
+        
+        // Load the first page to get a baseline aspect ratio
+        const firstPage = await pdfDoc.getPage(1);
+        const firstViewport = firstPage.getViewport({ scale: 1 });
+        const baselineAspect = firstViewport.width / firstViewport.height;
+
+        // Initialize viewer with placeholders
+        for (let i = 1; i <= totalPages; i++) {
+          await createPageElement(i, baselineAspect);
+        }
+        setupObserver();
       } catch (err) {
-        console.error('[pdfViewerHtml] loadPdf failed:', err);
-        loadingOverlay.innerHTML = '<div style="color:#c0392b;text-align:center;">' +
-          '<div style="font-size:28px;margin-bottom:8px;">⚠️</div>' +
-          'Failed to load PDF<br><span style="font-size:12px;color:#999;">' +
-          err.message + '</span></div>';
         sendMessage({ type: 'error', message: err.message });
       }
     }
 
-    // ---- Page Rendering ----
-    async function renderPage(pageNum) {
-      if (!pdfDoc || rendering) return;
-      rendering = true;
-
+    async function createPageElement(pageNum, fallbackAspect) {
+      let aspect = fallbackAspect || 0.707; // Default to A4 aspect
+      
       try {
-        console.log('[pdfViewerHtml] renderPage:', pageNum);
-        const page = await pdfDoc.getPage(pageNum);
-        const containerW = container.clientWidth;
-        const containerH = container.clientHeight;
-        const unscaledViewport = page.getViewport({ scale: 1 });
+        const containerWidth = viewerContainer.clientWidth || window.innerWidth;
+        const width = Math.max(containerWidth - 20, 100);
+        const height = width / aspect;
 
-        // Scale to fit the container
-        const scaleW = containerW / unscaledViewport.width;
-        const scaleH = containerH / unscaledViewport.height;
-        const scale = Math.min(scaleW, scaleH);
+        const container = document.createElement('div');
+        container.id = 'page-' + pageNum;
+        container.className = 'page-container';
+        container.style.width = width + 'px';
+        container.style.height = height + 'px';
+        container.dataset.page = pageNum;
 
-        // Use device pixel ratio for crisp rendering
-        const dpr = window.devicePixelRatio || 2;
-        const viewport = page.getViewport({ scale: scale * dpr });
+        container.innerHTML =
+          '<div class="page-placeholder" style="height:' + height + 'px">Page ' + pageNum + '</div>' +
+          '<canvas class="page-canvas" style="display:none"></canvas>' +
+          '<div class="annotations-layer"></div>';
 
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        canvas.style.width = (viewport.width / dpr) + 'px';
-        canvas.style.height = (viewport.height / dpr) + 'px';
-
-        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-
-        // Position annotation layer to match the canvas
-        annotLayer.style.width = canvas.style.width;
-        annotLayer.style.height = canvas.style.height;
-        // Center the annotation layer on the canvas
-        annotLayer.style.left = canvas.offsetLeft + 'px';
-        annotLayer.style.top = canvas.offsetTop + 'px';
-
-        currentPage = pageNum;
-        renderAnnotations();
-        sendMessage({ type: 'pageLoaded', page: currentPage, totalPages: totalPages });
+        viewerContainer.appendChild(container);
+        pageRenderState.set(pageNum, { rendering: false, rendered: false });
       } catch (err) {
-        console.error('[pdfViewerHtml] renderPage failed:', err);
-        sendMessage({ type: 'error', message: 'Render error: ' + err.message });
-      } finally {
-        rendering = false;
+        console.error('Failed to create placeholder for page', pageNum, err);
       }
     }
 
-    // ---- Annotations ----
-    function renderAnnotations() {
-      clearInlineViewers();
-      annotLayer.innerHTML = '';
-      currentAnnotations.forEach(function(ann) {
+    function setupObserver() {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          const pageNum = parseInt(entry.target.dataset.page);
+          if (entry.isIntersecting) {
+            renderPage(pageNum);
+            // Report current visible page - use a higher threshold for reporting
+            if (entry.intersectionRatio > 0.6) {
+              sendMessage({ type: 'pageLoaded', page: pageNum, totalPages: totalPages });
+            }
+          }
+        });
+      }, { 
+        threshold: [0, 0.25, 0.5, 0.75, 1.0],
+        rootMargin: '100px 0px' // Start rendering before they come into view
+      });
+
+      document.querySelectorAll('.page-container').forEach(el => observer.observe(el));
+    }
+
+    async function renderPage(pageNum) {
+      const state = pageRenderState.get(pageNum);
+      if (!state || state.rendering || state.rendered) return;
+      state.rendering = true;
+
+      try {
+        const page = await pdfDoc.getPage(pageNum);
+        const container = document.getElementById('page-' + pageNum);
+        if (!container) return;
+        
+        const canvas = container.querySelector('.page-canvas');
+        const ctx = canvas.getContext('2d');
+        const placeholder = container.querySelector('.page-placeholder');
+
+        // Cap DPR at 2.0 to avoid massive memory usage on high-density screens
+        const dpr = Math.min(window.devicePixelRatio || 1, 2.0);
+        const viewport = page.getViewport({ scale: (container.clientWidth / page.getViewport({ scale: 1 }).width) * dpr });
+
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        canvas.style.display = 'block';
+        if (placeholder) placeholder.style.display = 'none';
+
+        // Clear before render
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+        state.rendered = true;
+        
+        // Render annotations if we have any for this page
+        renderAnnotationsForPage(pageNum);
+      } catch (err) {
+        console.error('Render failed for page', pageNum, err);
+      } finally {
+        state.rendering = false;
+      }
+    }
+
+    function renderAnnotationsForPage(pageNum) {
+      const container = document.getElementById('page-' + pageNum);
+      if (!container) return;
+      const layer = container.querySelector('.annotations-layer');
+      const annotations = currentAnnotationsMap.get(pageNum) || [];
+      
+      layer.innerHTML = '';
+      annotations.forEach(ann => {
         const div = document.createElement('div');
         div.className = 'hotspot';
         div.style.left = (ann.x * 100) + '%';
@@ -600,50 +462,45 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         viewerEl.className = 'hotspot-viewer';
         div.appendChild(viewerEl);
 
+        // Clickable overlay to trigger full-screen expansion
+        const overlay = document.createElement('div');
+        overlay.style.position = 'absolute';
+        overlay.style.inset = '0';
+        overlay.style.zIndex = '10';
+        overlay.style.cursor = 'pointer';
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'flex-end';
+        overlay.style.justifyContent = 'flex-end';
+        overlay.style.padding = '5px';
+        overlay.innerHTML = \`
+          <div style="background: rgba(0,0,0,0.5); border-radius: 4px; padding: 2px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+            </svg>
+          </div>
+        \`;
+        overlay.onclick = (e) => {
+          e.stopPropagation();
+          sendMessage({ type: 'hotspotClick', annotation: ann });
+        };
+        div.appendChild(overlay);
+
         if (ann.thumbnailUrl) {
           const thumb = document.createElement('img');
           thumb.className = 'hotspot-thumb';
           thumb.src = ann.thumbnailUrl;
-          thumb.alt = ann.displayName || '3D preview';
-          thumb.onerror = function() { thumb.remove(); };
           viewerEl.appendChild(thumb);
         }
-
-        const activateBtn = document.createElement('button');
-        activateBtn.className = 'hotspot-activate';
-        activateBtn.textContent = 'Interact';
-        let startedInline = false;
-        const startInline = () => {
-          if (startedInline) return;
-          startedInline = true;
-          activateBtn.remove();
-          viewerEl.innerHTML = '';
-          initInlineModelViewer(viewerEl, ann);
-        };
-        activateBtn.addEventListener('click', function(e) {
-          e.stopPropagation();
-          startInline();
-        });
-        viewerEl.addEventListener('pointerdown', function() {
-          startInline();
-        }, { once: true });
-        div.appendChild(activateBtn);
-
-        const openBtn = document.createElement('button');
-        openBtn.className = 'hotspot-open';
-        openBtn.textContent = 'Open';
-        openBtn.addEventListener('click', function(e) {
-          e.stopPropagation();
-          sendMessage({ type: 'hotspotClick', annotation: ann });
-        });
-        div.appendChild(openBtn);
 
         const label = document.createElement('span');
         label.className = 'hotspot-label';
         label.textContent = ann.displayName || ann.label || '3D Model';
         div.appendChild(label);
 
-        annotLayer.appendChild(div);
+        layer.appendChild(div);
+
+        // Auto-initialize the inline viewer
+        initInlineModelViewer(viewerEl, ann);
       });
     }
 
@@ -651,35 +508,25 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
     function handleMessage(event) {
       try {
         const data = JSON.parse(event.data);
-        console.log('[pdfViewerHtml] RN message:', data);
-        if (data.type === 'goToPage' && data.page >= 1 && data.page <= totalPages) {
-          renderPage(data.page);
+        if (data.type === 'goToPage') {
+          const el = document.getElementById('page-' + data.page);
+          if (el) el.scrollIntoView();
         } else if (data.type === 'setAnnotations') {
-          currentAnnotations = data.annotations || [];
-          // Warm up runtime in background to reduce first interaction latency.
-          loadThreeRuntime().catch(() => {});
-          renderAnnotations();
+          const incoming = data.annotations || [];
+          if (incoming.length > 0) {
+            const pg = incoming[0].page_number;
+            currentAnnotationsMap.set(pg, incoming);
+            
+            // Refresh visible page's annotations if it's the one we just received
+            const el = document.getElementById('page-' + pg);
+            if (el && pageRenderState.get(pg)?.rendered) renderAnnotationsForPage(pg);
+          }
         }
-      } catch (e) { /* ignore parse errors */ }
+      } catch (e) { }
     }
 
-    // Listen for messages from both iOS and Android WebView
     window.addEventListener('message', handleMessage);
     document.addEventListener('message', handleMessage);
-
-    // Handle resize (orientation change)
-    window.addEventListener('resize', function() {
-      if (pdfDoc && !rendering) renderPage(currentPage);
-    });
-
-    window.addEventListener('beforeunload', clearInlineViewers);
-    window.addEventListener('beforeunload', () => {
-      modelBlobUrlCache.forEach((url) => URL.revokeObjectURL(url));
-      modelBlobUrlCache.clear();
-      modelBlobPromiseCache.clear();
-    });
-
-    // Start
     loadPdf();
   </script>
 </body>

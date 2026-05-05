@@ -22,6 +22,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../../constants/theme';
 import {
   clearAuth,
@@ -34,6 +35,7 @@ import PdfViewer from './PdfViewer';
 import ModelModal from './ModelModal';
 
 export default function ReadingTab({ book }) {
+  const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(null);
   const [authToken, setAuthToken] = useState(null);
@@ -159,6 +161,23 @@ export default function ReadingTab({ book }) {
   /* ---------- Render ---------- */
   return (
     <View style={styles.container}>
+      {/* Top Header Bar */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
+          <Ionicons name="chevron-back" size={24} color={COLORS.navy} />
+        </TouchableOpacity>
+
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {book?.title || 'Anatomy 101'}
+          </Text>
+        </View>
+
+        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
+          <Ionicons name="close" size={24} color={COLORS.navy} />
+        </TouchableOpacity>
+      </View>
+
       {/* PDF Viewer */}
       <View style={styles.pdfContainer}>
         <PdfViewer
@@ -198,64 +217,6 @@ export default function ReadingTab({ book }) {
         )}
       </View>
 
-      {/* Bottom Navigation Bar */}
-      <View style={styles.navBar}>
-        <TouchableOpacity
-          onPress={() => goToPage(currentPage - 1)}
-          disabled={currentPage <= 1}
-          style={[styles.navBtn, currentPage <= 1 && styles.navBtnDisabled]}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={20}
-            color={currentPage <= 1 ? COLORS.textMuted : COLORS.navy}
-          />
-          <Text
-            style={[
-              styles.navBtnText,
-              currentPage <= 1 && styles.navBtnTextDisabled,
-            ]}
-          >
-            Prev
-          </Text>
-        </TouchableOpacity>
-
-        <View style={styles.navCenter}>
-          <Text style={styles.navPageText}>
-            Page {currentPage}{totalPages ? ` of ${totalPages}` : ''}
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          onPress={() => goToPage(currentPage + 1)}
-          disabled={totalPages ? currentPage >= totalPages : false}
-          style={[
-            styles.navBtn,
-            totalPages && currentPage >= totalPages && styles.navBtnDisabled,
-          ]}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              styles.navBtnText,
-              totalPages && currentPage >= totalPages && styles.navBtnTextDisabled,
-            ]}
-          >
-            Next
-          </Text>
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color={
-              totalPages && currentPage >= totalPages
-                ? COLORS.textMuted
-                : COLORS.navy
-            }
-          />
-        </TouchableOpacity>
-      </View>
-
       {/* 3D Model Modal */}
       <ModelModal
         visible={!!selectedAnnotation}
@@ -272,6 +233,31 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f0ece4',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.lg,
+    paddingTop: Platform.OS === 'ios' ? 60 : SPACING.lg,
+    paddingBottom: SPACING.md,
+    backgroundColor: '#FCF4DD',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  headerBtn: {
+    padding: SPACING.xs,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: SPACING.md,
+  },
+  headerTitle: {
+    fontSize: FONT_SIZES.lg,
+    fontFamily: FONTS.serifBold,
+    color: COLORS.navy,
+    textAlign: 'center',
   },
   centered: {
     flex: 1,
@@ -337,47 +323,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     padding: SPACING.sm,
     borderRadius: RADIUS.lg,
-  },
-
-  /* Bottom nav */
-  navBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    paddingBottom: Platform.OS === 'ios' ? SPACING.xl : SPACING.md,
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.borderLight,
-  },
-  navBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.bgLight,
-    gap: 4,
-  },
-  navBtnDisabled: {
-    opacity: 0.4,
-  },
-  navBtnText: {
-    color: COLORS.navy,
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-    fontFamily: FONTS.medium,
-  },
-  navBtnTextDisabled: {
-    color: COLORS.textMuted,
-  },
-  navCenter: {
-    alignItems: 'center',
-  },
-  navPageText: {
-    color: COLORS.textPrimary,
-    fontSize: FONT_SIZES.sm,
-    fontFamily: FONTS.regular,
   },
 });

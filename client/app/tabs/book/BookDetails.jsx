@@ -48,17 +48,17 @@ export default function BookDetails() {
   };
 
   const handleStartReading = () => {
-    router.push({
-      pathname: '/tabs/Reader',
-      params: {
-        book: JSON.stringify({
-          id: book.id,
-          title: book.title,
-          pdfUrl: book.pdfUrl,
-        }),
-      },
-    });
-  };
+      router.push({
+        pathname: '/tabs/Reader',
+        params: {
+          book: JSON.stringify({
+            id: book.id,
+            title: book.title,
+            pdfUrl: book.pdfUrl,
+          }),
+        },
+      });
+    };
 
   // NEW: "Buy Now" just flips the local owned state
   const handleBuyNow = () => {
@@ -126,40 +126,49 @@ export default function BookDetails() {
             <View style={styles.divider} />
 
             {isOwned || isFreeLibraryBook ? (
-              /* ---------- OWNED / FREE: Show reading controls ---------- */
+              /* ---------- OWNED / FREE: Show progress bar + reading button ---------- */
               <View style={styles.ownedActions}>
-                <TouchableOpacity style={styles.startReadingButtonFull} onPress={handleStartReading} activeOpacity={0.8}>
-                  <Ionicons name="book" size={20} color={COLORS.white} />
-                  <Text style={styles.startReadingTextFull}>
-                    {isOwned ? 'Continue Reading' : 'Start Reading'}
+                <View style={styles.progressSection}>
+                  <View style={styles.progressLabelRow}>
+                    <Text style={styles.progressLabel}>Reading Progress</Text>
+                    <Text style={styles.progressPercent}>{book.readingProgress || 0}%</Text>
+                  </View>
+                  <View style={styles.progressBarBg}>
+                    <View style={[styles.progressBarFill, { width: `${book.readingProgress || 0}%` }]} />
+                  </View>
+                </View>
+
+                <TouchableOpacity style={styles.startReadingButton} onPress={handleStartReading} activeOpacity={0.8}>
+                  <Text style={styles.startReadingText}>
+                    {isOwned ? 'Continue' : 'Start'}
                   </Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              /* ---------- NOT OWNED: Show purchase controls ---------- */
+              /* ---------- NOT OWNED: Show purchase controls in 3 columns ---------- */
               <View style={styles.purchaseActions}>
-                <TouchableOpacity style={styles.buyNowButton} onPress={handleBuyNow} activeOpacity={0.8}>
+                <TouchableOpacity style={[styles.actionButton, styles.buyNowButton]} onPress={handleBuyNow} activeOpacity={0.8}>
                   <Text style={styles.buyNowText}>Buy Now</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.outlineButton, addedToCart && styles.outlineButtonAdded]}
-                  onPress={handleAddToCart}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name={addedToCart ? 'checkmark-circle' : 'cart-outline'} size={16} color={COLORS.navy} />
-                  <Text style={styles.outlineButtonText}>{addedToCart ? 'Added!' : 'Add to Cart'}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.outlineButton, isLiked && styles.outlineButtonLiked]}
+                  style={[styles.actionButton, styles.outlineButton, isLiked && styles.outlineButtonLiked]}
                   onPress={handleAddToLikes}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={16} color={isLiked ? COLORS.red : COLORS.navy} />
+                  <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={12} color={isLiked ? COLORS.red : COLORS.navy} />
                   <Text style={[styles.outlineButtonText, isLiked && { color: COLORS.red }]}>
                     {isLiked ? 'Liked' : 'Add to Likes'}
                   </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.outlineButton, addedToCart && styles.outlineButtonAdded]}
+                  onPress={handleAddToCart}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name={addedToCart ? 'checkmark-circle' : 'cart-outline'} size={12} color={COLORS.navy} />
+                  <Text style={styles.outlineButtonText}>{addedToCart ? 'Added!' : 'Add to Cart'}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -227,7 +236,7 @@ const styles = StyleSheet.create({
   backText: { fontSize: FONT_SIZES.regular, fontWeight: '600', color: COLORS.navy, fontFamily: FONTS.regular },
 
   topRow: { flexDirection: 'row', marginBottom: SPACING.lg },
-  coverWrapper: { width: 120, height: 175, borderRadius: RADIUS.md, borderWidth: 2, borderColor: COLORS.orange, overflow: 'hidden', marginRight: SPACING.lg },
+  coverWrapper: { width: 120, height: 175, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.navy, overflow: 'hidden', marginRight: SPACING.lg },
   bookCover: { width: '100%', height: '100%' },
 
   infoColumn: { flex: 1, paddingTop: 2 },
@@ -246,17 +255,50 @@ const styles = StyleSheet.create({
 
   actionSection: { marginTop: SPACING.xs },
   divider: { height: 1, backgroundColor: COLORS.border, marginBottom: SPACING.lg },
-  purchaseActions: { flexDirection: 'row', gap: SPACING.sm, flexWrap: 'wrap', marginBottom: SPACING.sm },
-  buyNowButton: { backgroundColor: COLORS.orange, paddingHorizontal: 22, paddingVertical: 10, borderRadius: RADIUS.xl },
-  buyNowText: { fontSize: 13, fontWeight: '700', color: COLORS.white, fontFamily: FONTS.regular },
-  outlineButton: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: COLORS.navy, paddingHorizontal: SPACING.md, paddingVertical: 9, borderRadius: RADIUS.xl, gap: 5 },
-  outlineButtonText: { fontSize: FONT_SIZES.md, fontWeight: '600', color: COLORS.navy, fontFamily: FONTS.regular },
+  
+  // 3-Column Purchase Actions
+  purchaseActions: { flexDirection: 'row', gap: 6, marginBottom: SPACING.sm },
+  actionButton: { 
+    flex: 1, 
+    height: 30, 
+    borderRadius: RADIUS.md, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    gap: 4,
+  },
+  buyNowButton: { backgroundColor: COLORS.navy },
+  buyNowText: { fontSize: 10, fontWeight: '700', color: COLORS.orange, fontFamily: FONTS.bold },
+  
+  outlineButton: { borderWidth: 1, borderColor: COLORS.navy },
+  outlineButtonText: { fontSize: 10, fontWeight: '600', color: COLORS.navy, fontFamily: FONTS.regular },
   outlineButtonLiked: { borderColor: COLORS.red, backgroundColor: '#fff5f5' },
   outlineButtonAdded: { borderColor: COLORS.navy, backgroundColor: '#f1f8f4' },
 
-  ownedActions: { marginTop: SPACING.xs, marginBottom: SPACING.sm },
-  startReadingButtonFull: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.orange, paddingVertical: 14, borderRadius: RADIUS.pill, gap: SPACING.sm, marginBottom: SPACING.sm },
-  startReadingTextFull: { color: COLORS.white, fontSize: FONT_SIZES.regular, fontWeight: '700', fontFamily: FONTS.bold },
+  // Progress + Start Reading Row
+  ownedActions: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginTop: SPACING.xs, 
+    marginBottom: SPACING.sm,
+    gap: SPACING.lg 
+  },
+  progressSection: { flex: 1 },
+  progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  progressLabel: { fontSize: 11, color: COLORS.textSecondary, fontFamily: FONTS.regular },
+  progressPercent: { fontSize: 11, fontWeight: '700', color: COLORS.navy, fontFamily: FONTS.bold },
+  progressBarBg: { height: 6, backgroundColor: COLORS.border, borderRadius: 3, overflow: 'hidden' },
+  progressBarFill: { height: '100%', backgroundColor: COLORS.navy },
+  
+  startReadingButton: { 
+    backgroundColor: COLORS.orange, 
+    height: 30, 
+    paddingHorizontal: SPACING.lg, 
+    borderRadius: RADIUS.md, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  startReadingText: { color: COLORS.navy, fontSize: 12, fontWeight: '700', fontFamily: FONTS.bold },
 
   sectionDivider: { height: 1, backgroundColor: COLORS.border, marginVertical: SPACING.xl },
   sectionTitle: { fontSize: FONT_SIZES.xl, fontWeight: '700', color: COLORS.navy, marginBottom: SPACING.md, fontFamily: FONTS.serifBold },

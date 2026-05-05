@@ -89,6 +89,8 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
       console.log('[modelViewerHtml] sendMessage:', data);
       if (window.ReactNativeWebView) {
         window.ReactNativeWebView.postMessage(JSON.stringify(data));
+      } else {
+        window.parent.postMessage(JSON.stringify(data), '*');
       }
     }
 
