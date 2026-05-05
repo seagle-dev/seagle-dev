@@ -138,6 +138,31 @@ export async function fetchMappings(bookId, page) {
   return res.data.data || res.data;
 }
 
+export async function fetchBookMappings(bookId) {
+  let res;
+  try {
+    console.log('[API] fetchBookMappings - bookId:', bookId);
+    res = await api.get(`/library/books/${bookId}/mappings`);
+    console.log('[API] fetchBookMappings - success:', res.data);
+  } catch (err) {
+    console.error('[API] fetchBookMappings - error:', {
+      url: err?.config?.url,
+      method: err?.config?.method,
+      status: err?.response?.status,
+      statusText: err?.response?.statusText,
+      responseData: err?.response?.data,
+      message: err?.message,
+    });
+    
+    if (err?.response?.status !== 401) throw err;
+    
+    console.log('[API] Got 401, refreshing token...');
+    await refreshToken();
+    res = await api.get(`/library/books/${bookId}/mappings`);
+  }
+  return res.data.data || res.data;
+}
+
 // ==================== HOME (auth required) ====================
 
 export async function fetchHome() {

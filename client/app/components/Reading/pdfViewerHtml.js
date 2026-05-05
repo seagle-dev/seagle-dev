@@ -71,25 +71,30 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       position: absolute;
       pointer-events: auto;
       cursor: default;
-      border: 2px solid rgba(74, 144, 217, 0.7);
-      border-radius: 6px;
-      background: rgba(74, 144, 217, 0.06);
+      border: 0;
+      border-radius: 4px;
+      background: #303030;
       display: block;
-      transition: background 0.2s, border-color 0.2s;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
       overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.14);
     }
     .hotspot:hover,
     .hotspot:active {
-      background: rgba(74, 144, 217, 0.2);
-      border-color: rgba(74, 144, 217, 1);
+      transform: translateY(-1px);
+      box-shadow: 0 5px 14px rgba(0,0,0,0.18);
     }
     .hotspot-viewer {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
-      background: #d9d9d9;
+      background: #303030;
       touch-action: none;
+    }
+    .hotspot-viewer canvas {
+      position: relative;
+      z-index: 2;
     }
     .hotspot-thumb {
       position: absolute;
@@ -98,7 +103,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       height: 100%;
       object-fit: cover;
       z-index: 1;
-      background: #d9d9d9;
+      background: #303030;
     }
     .hotspot-activate {
       position: absolute;
@@ -135,6 +140,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       max-width: 90%;
       overflow: hidden;
       text-overflow: ellipsis;
+      display: none;
     }
     .hotspot-open {
       position: absolute;
@@ -211,6 +217,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
     // ---- State ----
     let pdfDoc = null;
     let totalPages = 0;
+    let lastReportedPage = null;
     let currentAnnotationsMap = new Map(); // pageNum -> annotations[]
     const pageRenderState = new Map(); // pageNum -> { rendering: bool, rendered: bool }
     const inlineViewers = [];
@@ -283,8 +290,28 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       if (!ann?.modelUrl) throw new Error('missing model URL');
       if (modelBlobUrlCache.has(ann.modelUrl)) return modelBlobUrlCache.get(ann.modelUrl);
       if (!modelBlobPromiseCache.has(ann.modelUrl)) {
-        modelBlobPromiseCache.set(ann.modelUrl, fetch(ann.modelUrl, { headers: ${authHeaders} })
-          .then(r => r.blob()).then(b => {
+        const isLocalFile = ann.modelUrl.startsWith('file://') || ann.modelUrl.startsWith('content://');
+        const requestBlob = fetch(ann.modelUrl, isLocalFile ? undefined : { headers: ${authHeaders} })
+          .then(r => r.blob())
+          .catch(err => {
+            if (!isLocalFile) throw err;
+            return new Promise((resolve, reject) => {
+              const xhr = new XMLHttpRequest();
+              xhr.open('GET', ann.modelUrl, true);
+              xhr.responseType = 'blob';
+              xhr.onload = () => {
+                if (xhr.status === 0 || (xhr.status >= 200 && xhr.status < 300)) {
+                  resolve(xhr.response);
+                } else {
+                  reject(new Error('XHR ' + xhr.status));
+                }
+              };
+              xhr.onerror = () => reject(new Error('XHR failed'));
+              xhr.send();
+            });
+          });
+
+        modelBlobPromiseCache.set(ann.modelUrl, requestBlob.then(b => {
             const url = URL.createObjectURL(b);
             modelBlobUrlCache.set(ann.modelUrl, url);
             return url;
@@ -324,7 +351,20 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
           model.position.set(-center.x, -center.y, -center.z);
           const pivot = new THREE.Group(); pivot.add(model);
           pivot.scale.setScalar(2 / maxDim);
+          const scaledBox = new THREE.Box3().setFromObject(pivot);
+          pivot.position.y -= scaledBox.min.y;
           scene.add(pivot);
+          const finalBox = new THREE.Box3().setFromObject(pivot);
+          const finalCenter = finalBox.getCenter(new THREE.Vector3());
+          const finalSize = finalBox.getSize(new THREE.Vector3());
+          const fov = camera.fov * (Math.PI / 180);
+          const dist = (Math.max(finalSize.x, finalSize.y, finalSize.z) / 2) / Math.tan(fov / 2) * 1.55;
+          controls.target.copy(finalCenter);
+          camera.position.set(finalCenter.x + dist * 0.24, finalCenter.y + dist * 0.18, finalCenter.z + dist);
+          camera.lookAt(finalCenter);
+          controls.update();
+          const thumb = rootEl.querySelector('.hotspot-thumb');
+          if (thumb) thumb.style.display = 'none';
           animate();
         });
       });
@@ -392,7 +432,8 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
           if (entry.isIntersecting) {
             renderPage(pageNum);
             // Report current visible page - use a higher threshold for reporting
-            if (entry.intersectionRatio > 0.6) {
+            if (entry.intersectionRatio > 0.6 && pageNum !== lastReportedPage) {
+              lastReportedPage = pageNum;
               sendMessage({ type: 'pageLoaded', page: pageNum, totalPages: totalPages });
             }
           }
@@ -469,14 +510,11 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         overlay.style.zIndex = '10';
         overlay.style.cursor = 'pointer';
         overlay.style.display = 'flex';
-        overlay.style.alignItems = 'flex-end';
+        overlay.style.alignItems = 'flex-start';
         overlay.style.justifyContent = 'flex-end';
         overlay.style.padding = '5px';
         overlay.innerHTML = \`
-          <div style="background: rgba(0,0,0,0.5); border-radius: 4px; padding: 2px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
-            </svg>
+          <div style="width: 24px; height: 8px; background: #FF8C42; border: 2px solid #fff; border-radius: 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.22);">
           </div>
         \`;
         overlay.onclick = (e) => {
@@ -513,14 +551,14 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
           if (el) el.scrollIntoView();
         } else if (data.type === 'setAnnotations') {
           const incoming = data.annotations || [];
-          if (incoming.length > 0) {
-            const pg = incoming[0].page_number;
-            currentAnnotationsMap.set(pg, incoming);
-            
-            // Refresh visible page's annotations if it's the one we just received
-            const el = document.getElementById('page-' + pg);
-            if (el && pageRenderState.get(pg)?.rendered) renderAnnotationsForPage(pg);
-          }
+          const pg = data.page || incoming[0]?.page_number;
+          if (!pg) return;
+
+          currentAnnotationsMap.set(pg, incoming);
+
+          // Refresh visible page's annotations if it's the one we just received
+          const el = document.getElementById('page-' + pg);
+          if (el && pageRenderState.get(pg)?.rendered) renderAnnotationsForPage(pg);
         }
       } catch (e) { }
     }

@@ -31,7 +31,6 @@ const PdfViewer = memo(function PdfViewer({
 }) {
   const webViewRef = useRef(null);
   const iframeRef = useRef(null);
-  const lastSentPage = useRef(null);
   const lastSentAnnotationsKey = useRef(null);
 
   // Generate the HTML once (pdfUrl + token are stable for a given book)
@@ -50,22 +49,9 @@ const PdfViewer = memo(function PdfViewer({
     }
   };
 
-  // Debug: confirm the reader is mounting with the expected URL/token state.
-  useEffect(() => {
-    console.log(`[PdfViewer] mounted on ${Platform.OS} with pdfUrl:`, pdfUrl);
-  }, [pdfUrl]);
-
-  // Send page navigation command when page prop changes
-  useEffect(() => {
-    if (page && page !== lastSentPage.current) {
-      lastSentPage.current = page;
-      postToViewer({ type: 'goToPage', page });
-    }
-  }, [page]);
-
   // Send annotations to the WebView when they change
   useEffect(() => {
-    const key = annotations.map((a) => a.id).join(',');
+    const key = `${page}:${annotations.map((a) => a.id).join(',')}`;
     if (key === lastSentAnnotationsKey.current) return;
     lastSentAnnotationsKey.current = key;
 
@@ -79,13 +65,15 @@ const PdfViewer = memo(function PdfViewer({
       label: a.label,
       model_id: a.model_id,
       displayName: a.model?.name || a.label || '3D Model',
-      thumbnailUrl: a.model_id ? getModelThumbnailUrl(a.model_id) : null,
-      modelUrl: a.model_id ? getModelFileUrl(a.model_id) : null,
+      thumbnailUrl: a.model?.localFileUri
+        ? (a.model?.thumbnail || null)
+        : (a.model?.thumbnail || (a.model_id ? getModelThumbnailUrl(a.model_id) : null)),
+      modelUrl: a.model?.localFileUri || (a.model_id ? getModelFileUrl(a.model_id) : null),
       view_state: a.model?.view_state ?? a.model?.viewState ?? a.model_view_state ?? null,
     }));
 
-    postToViewer({ type: 'setAnnotations', annotations: payload });
-  }, [annotations]);
+    postToViewer({ type: 'setAnnotations', page, annotations: payload });
+  }, [annotations, page]);
 
   // Handle messages from the WebView
   const handleMessage = useCallback(
@@ -97,7 +85,6 @@ const PdfViewer = memo(function PdfViewer({
 
         if (!data) return;
         
-        console.log('[PdfViewer] Message received:', data.type);
         switch (data.type) {
           case 'pageLoaded':
             onPageLoaded?.(data.page, data.totalPages);
@@ -151,6 +138,8 @@ const PdfViewer = memo(function PdfViewer({
       javaScriptEnabled
       domStorageEnabled
       allowFileAccess
+      allowFileAccessFromFileURLs
+      allowUniversalAccessFromFileURLs
       mixedContentMode="always"
       onMessage={handleMessage}
       scrollEnabled={true}

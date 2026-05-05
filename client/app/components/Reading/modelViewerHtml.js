@@ -13,6 +13,7 @@
 export default function getModelViewerHtml(modelUrl, authToken, initialViewState = null) {
   console.log('[getModelViewerHtml] Called with initialViewState:', initialViewState);
   const viewStateStr = initialViewState ? JSON.stringify(initialViewState) : 'null';
+  const modelUrlStr = JSON.stringify(modelUrl);
   const authHeaders = JSON.stringify(
     authToken ? { Authorization: `Bearer ${authToken}` } : {},
   );
@@ -26,25 +27,60 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <style>
     * { margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #e8e8e8; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #303030; }
     canvas { display: block; width: 100%; height: 100%; touch-action: none; }
     #loading {
       position: absolute; inset: 0;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      background: #e8e8e8;
+      background: #303030;
       font-family: -apple-system, sans-serif;
-      color: #666; font-size: 14px;
+      color: rgba(255,255,255,0.78); font-size: 14px;
     }
     #debugInfo {
       position: absolute; bottom: 10px; left: 10px;
       background: rgba(0,0,0,0.8); color: #0f0; font-family: monospace; 
       font-size: 9px; padding: 5px; max-width: 200px; overflow: hidden;
-      max-height: 100px; overflow-y: auto; z-index: 9999;
+      max-height: 100px; overflow-y: auto; z-index: 9999; display: none;
+    }
+    #toolbar {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      transform: translateX(-50%);
+      background: #fff;
+      border: 1px solid rgba(17, 26, 80, 0.08);
+      border-radius: 6px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+      overflow: hidden;
+    }
+    .tool-btn {
+      width: 37px;
+      height: 33px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-right: 1px solid #d8deef;
+      background: #fff;
+      color: #111A50;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .tool-btn:last-child { border-right: 0; }
+    .tool-btn:active { background: #f0f3fb; }
+    .tool-btn svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      pointer-events: none;
     }
     .spin {
       width: 32px; height: 32px;
-      border: 3px solid #ddd; border-top-color: #4a90d9;
+      border: 3px solid rgba(255,255,255,0.25); border-top-color: #FF8C42;
       border-radius: 50%;
       animation: sp 0.8s linear infinite;
       margin-bottom: 12px;
@@ -55,6 +91,23 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
 <body>
   <div id="loading"><div class="spin"></div>Loading 3D model…</div>
   <div id="debugInfo"></div>
+  <div id="toolbar" aria-label="Model controls">
+    <button class="tool-btn" id="resetBtn" title="Reset view" aria-label="Reset view">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v6h6"/></svg>
+    </button>
+    <button class="tool-btn" id="zoomInBtn" title="Zoom in" aria-label="Zoom in">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M11 8v6"/><path d="M8 11h6"/></svg>
+    </button>
+    <button class="tool-btn" id="zoomOutBtn" title="Zoom out" aria-label="Zoom out">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M8 11h6"/></svg>
+    </button>
+    <button class="tool-btn" id="rotateBtn" title="Auto rotate" aria-label="Auto rotate">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+    </button>
+    <button class="tool-btn" id="panBtn" title="Pan with two fingers" aria-label="Pan with two fingers">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M12 2v5"/><path d="M12 17v5"/><path d="M2 12h5"/><path d="M17 12h5"/></svg>
+    </button>
+  </div>
 
   <script type="importmap">
     {
@@ -97,7 +150,7 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
     // ---- Scene Setup ----
     console.log('[modelViewerHtml] Setting up scene...');
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xe8e8e8);
+    scene.background = new THREE.Color(0x303030);
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 100);
     camera.position.set(0, 0, 4);
@@ -134,7 +187,81 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
     controls.dampingFactor = 0.08;
     controls.minDistance = 0.5;
     controls.maxDistance = 20;
+    controls.autoRotateSpeed = 2;
     console.log('[modelViewerHtml] OrbitControls initialized');
+
+    let defaultView = null;
+
+    function setDefaultView(finalBox, finalCenter) {
+      const finalSize = finalBox.getSize(new THREE.Vector3());
+      const fov = camera.fov * (Math.PI / 180);
+      const dist = (Math.max(finalSize.x, finalSize.y, finalSize.z) / 2) / Math.tan(fov / 2) * 1.5;
+      defaultView = {
+        target: finalCenter.clone(),
+        position: new THREE.Vector3(
+          finalCenter.x + dist * 0.4,
+          finalCenter.y + dist * 0.3,
+          finalCenter.z + dist
+        ),
+      };
+    }
+
+    function resetView() {
+      if (!defaultView) return;
+      controls.target.copy(defaultView.target);
+      camera.position.copy(defaultView.position);
+      camera.lookAt(defaultView.target);
+      controls.update();
+    }
+
+    function zoomBy(multiplier) {
+      const direction = new THREE.Vector3().subVectors(camera.position, controls.target);
+      direction.multiplyScalar(multiplier);
+      camera.position.copy(controls.target).add(direction);
+      controls.update();
+    }
+
+    document.getElementById('resetBtn').addEventListener('click', resetView);
+    document.getElementById('zoomInBtn').addEventListener('click', () => zoomBy(0.82));
+    document.getElementById('zoomOutBtn').addEventListener('click', () => zoomBy(1.18));
+    document.getElementById('rotateBtn').addEventListener('click', () => {
+      controls.autoRotate = !controls.autoRotate;
+    });
+    document.getElementById('panBtn').addEventListener('click', () => {
+      renderer.domElement.style.cursor = 'grab';
+      setTimeout(() => { renderer.domElement.style.cursor = 'default'; }, 900);
+    });
+
+    function loadBlobWithXhr(url) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.responseType = 'blob';
+        xhr.onload = () => {
+          if (xhr.status === 0 || (xhr.status >= 200 && xhr.status < 300)) {
+            resolve(xhr.response);
+          } else {
+            reject(new Error('XHR ' + xhr.status));
+          }
+        };
+        xhr.onerror = () => reject(new Error('XHR failed'));
+        xhr.send();
+      });
+    }
+
+    async function fetchModelBlob(url) {
+      const isLocalFile = url.startsWith('file://') || url.startsWith('content://');
+      try {
+        const resp = await fetch(url, isLocalFile ? undefined : { headers: ${authHeaders} });
+        console.log('[modelViewerHtml] Fetch response status:', resp.status);
+        if (!resp.ok && !isLocalFile) throw new Error('HTTP ' + resp.status);
+        return resp.blob();
+      } catch (err) {
+        if (!isLocalFile) throw err;
+        console.log('[modelViewerHtml] fetch local file failed, trying XHR:', err.message);
+        return loadBlobWithXhr(url);
+      }
+    }
 
     function applySavedViewState() {
       debugLog('[modelViewerHtml] applySavedViewState called');
@@ -213,14 +340,9 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
     // ---- Load Model ----
     async function loadModel() {
       try {
-        console.log('[modelViewerHtml] Starting model load from:', '${modelUrl}');
-        const resp = await fetch('${modelUrl}', {
-          headers: ${authHeaders}
-        });
-        console.log('[modelViewerHtml] Fetch response status:', resp.status);
-        
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        const blob = await resp.blob();
+        const modelUrl = ${modelUrlStr};
+        console.log('[modelViewerHtml] Starting model load from:', modelUrl);
+        const blob = await fetchModelBlob(modelUrl);
         console.log('[modelViewerHtml] Model blob received, size:', blob.size, 'bytes');
         
         const blobUrl = URL.createObjectURL(blob);
@@ -259,21 +381,11 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
 
             const finalBox = new THREE.Box3().setFromObject(pivot);
             const finalCenter = finalBox.getCenter(new THREE.Vector3());
+            setDefaultView(finalBox, finalCenter);
 
             if (!applySavedViewState()) {
               console.log('[modelViewerHtml] No saved view state, using default camera');
-              const finalSize = finalBox.getSize(new THREE.Vector3());
-              const fov = camera.fov * (Math.PI / 180);
-              const dist = (Math.max(finalSize.x, finalSize.y, finalSize.z) / 2) / Math.tan(fov / 2) * 1.5;
-
-              controls.target.copy(finalCenter);
-              camera.position.set(
-                finalCenter.x + dist * 0.4,
-                finalCenter.y + dist * 0.3,
-                finalCenter.z + dist
-              );
-              camera.lookAt(finalCenter);
-              controls.update();
+              resetView();
             }
 
             loadingEl.style.display = 'none';
