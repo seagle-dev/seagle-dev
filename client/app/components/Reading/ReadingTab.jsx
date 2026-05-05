@@ -179,7 +179,7 @@ export default function ReadingTab({ book }) {
       </View>
 
       {/* PDF Viewer */}
-      <View style={styles.pdfContainer}>
+      <View style={[styles.pdfContainer, selectedAnnotation && styles.pdfContainerDimmed]}>
         <PdfViewer
           pdfUrl={pdfUrl}
           authToken={authToken}
@@ -223,6 +223,7 @@ export default function ReadingTab({ book }) {
         model={selectedAnnotation?.model}
         authToken={authToken}
         onClose={handleCloseModal}
+        presentation="reader"
       />
     </View>
   );
@@ -282,6 +283,9 @@ const styles = StyleSheet.create({
   pdfContainer: {
     flex: 1,
     position: 'relative',
+  },
+  pdfContainerDimmed: {
+    opacity: 0.42,
   },
   pageBadge: {
     position: 'absolute',

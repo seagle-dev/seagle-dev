@@ -20,6 +20,7 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
+  Pressable,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,11 +28,18 @@ import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../../constants/t
 import { getModelFileUrl } from '../../../services/api';
 import getModelViewerHtml from './modelViewerHtml';
 
-const ModelModal = memo(function ModelModal({ visible, model, authToken, onClose }) {
+const ModelModal = memo(function ModelModal({
+  visible,
+  model,
+  authToken,
+  onClose,
+  presentation = 'full',
+}) {
   const [selectedPart, setSelectedPart] = useState(null);
   const iframeRef = useRef(null);
+  const isReaderPresentation = presentation === 'reader';
 
-  const modelUrl = model?.id ? getModelFileUrl(model.id) : null;
+  const modelUrl = model?.localFileUri || (model?.id ? getModelFileUrl(model.id) : null);
 
   // Debug: confirm the viewer receives the saved orientation payload.
   const viewState = model?.view_state ?? model?.viewState ?? null;
@@ -77,6 +85,64 @@ const ModelModal = memo(function ModelModal({ visible, model, authToken, onClose
     setSelectedPart(null);
     onClose?.();
   }, [onClose]);
+
+  if (isReaderPresentation) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="fade"
+        presentationStyle="overFullScreen"
+        transparent
+        onRequestClose={handleClose}
+      >
+        <StatusBar barStyle="light-content" backgroundColor="rgba(17,26,80,0.28)" translucent />
+        <Pressable style={styles.readerBackdrop} onPress={handleClose}>
+          <Pressable style={styles.readerCard} onPress={(event) => event.stopPropagation()}>
+            <TouchableOpacity
+              onPress={handleClose}
+              style={styles.readerCloseBtn}
+              activeOpacity={0.75}
+              accessibilityLabel="Close model viewer"
+            >
+              <Ionicons name="close" size={18} color={COLORS.orange} />
+            </TouchableOpacity>
+
+            {html ? (
+              <View style={styles.readerScene}>
+                {Platform.OS === 'web' ? (
+                  <iframe
+                    ref={iframeRef}
+                    srcDoc={html}
+                    style={{ width: '100%', height: '100%', border: 'none' }}
+                    title="3D Model Viewer"
+                  />
+                ) : (
+                <WebView
+                  source={{ html }}
+                  style={styles.webView}
+                  originWhitelist={['*']}
+                  javaScriptEnabled
+                  domStorageEnabled
+                  allowFileAccess
+                  allowFileAccessFromFileURLs
+                  allowUniversalAccessFromFileURLs
+                  mixedContentMode="always"
+                  onMessage={handleMessage}
+                  scrollEnabled={false}
+                    bounces={false}
+                  />
+                )}
+              </View>
+            ) : (
+              <View style={[styles.readerScene, styles.emptyState]}>
+                <Text style={styles.emptyText}>No model available</Text>
+              </View>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+    );
+  }
 
   return (
     <Modal
@@ -128,6 +194,8 @@ const ModelModal = memo(function ModelModal({ visible, model, authToken, onClose
                 javaScriptEnabled
                 domStorageEnabled
                 allowFileAccess
+                allowFileAccessFromFileURLs
+                allowUniversalAccessFromFileURLs
                 mixedContentMode="always"
                 onMessage={handleMessage}
                 scrollEnabled={false}
@@ -155,6 +223,49 @@ const ModelModal = memo(function ModelModal({ visible, model, authToken, onClose
 });
 
 const styles = StyleSheet.create({
+  readerBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+    backgroundColor: 'rgba(255,255,255,0.58)',
+  },
+  readerCard: {
+    width: '100%',
+    maxWidth: 360,
+    aspectRatio: 0.58,
+    borderRadius: RADIUS.sm,
+    overflow: 'hidden',
+    backgroundColor: '#2f2f2f',
+    ...Platform.select({
+      ios: {
+        shadowColor: COLORS.black,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.22,
+        shadowRadius: 24,
+      },
+      android: { elevation: 18 },
+      web: {
+        boxShadow: '0 18px 40px rgba(0,0,0,0.24)',
+      },
+    }),
+  },
+  readerScene: {
+    flex: 1,
+    backgroundColor: '#2f2f2f',
+  },
+  readerCloseBtn: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    zIndex: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(47,47,47,0.72)',
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.navyDeep,

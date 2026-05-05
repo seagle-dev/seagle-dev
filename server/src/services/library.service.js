@@ -174,4 +174,50 @@ async function getMappings(bookId, pageNumber) {
   }));
 }
 
-module.exports = { listBooks, listModels, getMappings };
+/**
+ * Get all annotation mappings for a book in one request.
+ * Used by mobile clients to build an offline page -> models lookup.
+ */
+async function getBookMappings(bookId) {
+  const sql = `
+    SELECT
+      m.id,
+      m.book_id,
+      m.page_number,
+      m.x,
+      m.y,
+      m.width,
+      m.height,
+      m.model_id,
+      m.label,
+      m.created_at,
+      md.name AS model_name,
+      md.thumbnail AS model_thumbnail,
+      md.view_state AS model_view_state
+    FROM mappings m
+    LEFT JOIN models_3d md ON md.id = m.model_id
+    WHERE m.book_id = ?
+    ORDER BY m.page_number, m.id
+  `;
+  const [rows] = await db.execute(sql, [bookId]);
+
+  const normalizeViewState = (raw) => {
+    if (!raw) return null;
+    if (typeof raw === 'object') return raw;
+    if (typeof raw === 'string') {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  return rows.map((row) => ({
+    ...row,
+    model_view_state: normalizeViewState(row.model_view_state),
+  }));
+}
+
+module.exports = { listBooks, listModels, getMappings, getBookMappings };
