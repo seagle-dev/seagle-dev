@@ -15,7 +15,7 @@
  *   onError       — (message) => void
  */
 import React, { useRef, useEffect, useCallback, memo } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { getModelThumbnailUrl, getModelFileUrl } from '../../../services/api';
 import getPdfViewerHtml from './pdfViewerHtml';
@@ -30,6 +30,7 @@ const PdfViewer = memo(function PdfViewer({
   onError,
 }) {
   const webViewRef = useRef(null);
+  const iframeRef = useRef(null);
   const lastSentPage = useRef(null);
   const lastSentAnnotationsKey = useRef(null);
 
@@ -39,19 +40,26 @@ const PdfViewer = memo(function PdfViewer({
     [pdfUrl, authToken],
   );
 
+  // Send message helper
+  const postToViewer = (payload) => {
+    const msg = JSON.stringify(payload);
+    if (Platform.OS === 'web') {
+      iframeRef.current?.contentWindow?.postMessage(msg, '*');
+    } else {
+      webViewRef.current?.postMessage(msg);
+    }
+  };
+
   // Debug: confirm the reader is mounting with the expected URL/token state.
   useEffect(() => {
-    console.log('[PdfViewer] mounted with pdfUrl:', pdfUrl);
-    console.log('[PdfViewer] auth token present:', !!authToken);
-  }, [pdfUrl, authToken]);
+    console.log(`[PdfViewer] mounted on ${Platform.OS} with pdfUrl:`, pdfUrl);
+  }, [pdfUrl]);
 
   // Send page navigation command when page prop changes
   useEffect(() => {
-    if (page && page !== lastSentPage.current && webViewRef.current) {
+    if (page && page !== lastSentPage.current) {
       lastSentPage.current = page;
-      webViewRef.current.postMessage(
-        JSON.stringify({ type: 'goToPage', page }),
-      );
+      postToViewer({ type: 'goToPage', page });
     }
   }, [page]);
 
@@ -63,6 +71,7 @@ const PdfViewer = memo(function PdfViewer({
 
     const payload = annotations.map((a) => ({
       id: a.id,
+      page_number: a.page_number,
       x: a.x,
       y: a.y,
       width: a.width,
@@ -75,23 +84,25 @@ const PdfViewer = memo(function PdfViewer({
       view_state: a.model?.view_state ?? a.model?.viewState ?? a.model_view_state ?? null,
     }));
 
-    webViewRef.current?.postMessage(
-      JSON.stringify({ type: 'setAnnotations', annotations: payload }),
-    );
+    postToViewer({ type: 'setAnnotations', annotations: payload });
   }, [annotations]);
 
   // Handle messages from the WebView
   const handleMessage = useCallback(
     (event) => {
       try {
-        const data = JSON.parse(event.nativeEvent.data);
-        console.log('[PdfViewer] WebView message:', data);
+        const data = typeof event.nativeEvent?.data === 'string' 
+          ? JSON.parse(event.nativeEvent.data) 
+          : (typeof event.data === 'string' ? JSON.parse(event.data) : null);
+
+        if (!data) return;
+        
+        console.log('[PdfViewer] Message received:', data.type);
         switch (data.type) {
           case 'pageLoaded':
             onPageLoaded?.(data.page, data.totalPages);
             break;
           case 'hotspotClick':
-            // Find the full annotation (with model data) from our props
             const fullAnnotation = annotations.find(
               (a) => a.id === data.annotation?.id,
             );
@@ -101,14 +112,35 @@ const PdfViewer = memo(function PdfViewer({
             onError?.(data.message);
             break;
         }
-      } catch {
-        /* ignore parse errors */
+      } catch (err) {
+        console.warn('[PdfViewer] Error parsing message:', err);
       }
     },
     [annotations, onPageLoaded, onHotspotClick, onError],
   );
 
+  // Listen for web messages
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      window.addEventListener('message', handleMessage);
+      return () => window.removeEventListener('message', handleMessage);
+    }
+  }, [handleMessage]);
+
   if (!pdfUrl) return null;
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.webView}>
+        <iframe
+          ref={iframeRef}
+          srcDoc={html}
+          style={{ width: '100%', height: '100%', border: 'none' }}
+          title="PDF Viewer"
+        />
+      </View>
+    );
+  }
 
   return (
     <WebView
@@ -121,9 +153,9 @@ const PdfViewer = memo(function PdfViewer({
       allowFileAccess
       mixedContentMode="always"
       onMessage={handleMessage}
-      scrollEnabled={false}
-      bounces={false}
-      showsVerticalScrollIndicator={false}
+      scrollEnabled={true}
+      bounces={true}
+      showsVerticalScrollIndicator={true}
       showsHorizontalScrollIndicator={false}
     />
   );

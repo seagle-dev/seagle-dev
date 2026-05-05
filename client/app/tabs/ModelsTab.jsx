@@ -11,13 +11,13 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchModels } from '../../services/api';
+import { fetchModels, getToken } from '../../services/api';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
 import usePaginatedList from '../hooks/usePaginatedList';
 import LoadingView from '../components/LoadingView';
 import EmptyState from '../components/EmptyState';
 import Badge from '../components/Badge';
-import ModelDetailModal from './models/ModelDetailModal';
+import ModelModal from '../components/Reading/ModelModal';
 
 const { width } = Dimensions.get('window');
 
@@ -40,6 +40,13 @@ const mapModel = (m) => ({
 export default function ModelsTab({ search = '', category = null }) {
   const [selectedModel, setSelectedModel] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [authToken, setAuthToken] = useState(null);
+
+  useEffect(() => {
+    if (modalVisible) {
+      getToken().then(setAuthToken);
+    }
+  }, [modalVisible]);
 
   const filters = useMemo(() => ({
     ...(search.trim() ? { search: search.trim() } : {}),
@@ -105,7 +112,12 @@ export default function ModelsTab({ search = '', category = null }) {
         onEndReachedThreshold={0.3}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={COLORS.navy} />}
       />
-      <ModelDetailModal visible={modalVisible} model={selectedModel} onClose={handleCloseModal} />
+      <ModelModal 
+        visible={modalVisible} 
+        model={selectedModel} 
+        authToken={authToken} 
+        onClose={handleCloseModal} 
+      />
     </View>
   );
 }

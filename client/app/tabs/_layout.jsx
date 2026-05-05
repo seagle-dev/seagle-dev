@@ -7,7 +7,7 @@ import { COLORS } from '../../constants/theme';
 export default function TabsLayout() {
   return (
     <View style={styles.container}>
-      <TopHeader showBackButton={false} title="" />
+      <TopHeader showBackButton={false} title="" showNotifications={false} showCart={false} />
       <View style={styles.contentClip}>
         <Slot />
       </View>

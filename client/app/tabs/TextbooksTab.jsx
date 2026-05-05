@@ -145,9 +145,11 @@ const styles = StyleSheet.create({
   bookCover: {
     width: 75,
     height: 110,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.md,
     marginRight: SPACING.body || 14,
     backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: COLORS.navy,
   },
   bookInfo: {
     flex: 1,

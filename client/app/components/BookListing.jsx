@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   recentCard: { backgroundColor: COLORS.bgWhite, marginHorizontal: SPACING.sm, marginBottom: SPACING.md, borderRadius: RADIUS.xl },
   recentCardContent: { flexDirection: 'row', padding: SPACING.lg, alignItems: 'center', gap: SPACING.md },
   bookCoverBg: { width: 110, height: 180, borderRadius: 3, overflow: 'hidden' },
-  bookCover: { width: 100, height: 150, borderRadius: SPACING.md },
+  bookCover: { width: 100, height: 150, borderRadius: SPACING.md, borderWidth: 1, borderColor: COLORS.navy },
   bookInfo: { flex: 1, justifyContent: 'flex-start', paddingTop: SPACING.xs },
   bookTitle: { fontSize: FONT_SIZES.xl, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.xs, lineHeight: 24, fontFamily: FONTS.serifBold },
   bookAuthor: { fontSize: 13, color: COLORS.textSecondary, marginBottom: SPACING.md, fontFamily: FONTS.regular },
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   // Trending card
   trendingCard: { backgroundColor: COLORS.bgWhite, marginHorizontal: SPACING.sm, marginBottom: SPACING.md, borderRadius: RADIUS.xl, overflow: 'visible' },
   trendingCardContent: { flexDirection: 'row', padding: SPACING.lg, paddingBottom: SPACING.md },
-  trendingCover: { width: 100, height: 150, borderRadius: SPACING.md, marginRight: SPACING.lg },
+  trendingCover: { width: 100, height: 150, borderRadius: SPACING.md, marginRight: SPACING.lg, borderWidth: 1, borderColor: COLORS.navy },
   trendingBookInfo: { flex: 1, justifyContent: 'flex-start', paddingTop: SPACING.xs },
   trendingBookTitle: { fontSize: 17, fontWeight: '700', color: COLORS.navy, marginBottom: SPACING.xs, lineHeight: 22, fontFamily: FONTS.serifBold },
   trendingBookAuthor: { fontSize: 13, color: COLORS.textSecondary, marginBottom: SPACING.md, fontFamily: FONTS.light },
