@@ -21,6 +21,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../../constants/theme';
@@ -42,6 +43,8 @@ export default function ReadingTab({ book }) {
   const [authError, setAuthError] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [selectedAnnotation, setSelectedAnnotation] = useState(null);
+  const [modelContextMap, setModelContextMap] = useState({});
+  const [modelContextVersion, setModelContextVersion] = useState(0);
 
   const bookId = book?.id;
   const pdfUrl = bookId ? getBookPdfUrl(bookId) : null;
@@ -107,8 +110,7 @@ export default function ReadingTab({ book }) {
 
   const handleHotspotClick = useCallback(
     (annotation) => {
-      // Find the enriched annotation from our hook data
-      const enriched = annotations.find((a) => a.id === annotation?.id);
+      const enriched = annotations.find((a) => String(a.id) === String(annotation?.id));
       setSelectedAnnotation(enriched || annotation);
     },
     [annotations],
@@ -117,6 +119,59 @@ export default function ReadingTab({ book }) {
   const handleCloseModal = useCallback(() => {
     setSelectedAnnotation(null);
   }, []);
+
+  const handleModelContextReady = useCallback((modelContext) => {
+    if (!modelContext?.id) return;
+
+    setModelContextMap((current) => ({
+      ...current,
+      [String(modelContext.id)]: modelContext,
+    }));
+    setModelContextVersion((current) => current + 1);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function preloadPageModelContexts() {
+      const pageModels = annotations
+        .map((annotation) => annotation?.model)
+        .filter((model) => model?.id != null && model?.localFileUri);
+
+      if (!pageModels.length) return;
+
+      for (const model of pageModels) {
+        const modelKey = String(model.id);
+        if (modelContextMap[modelKey]?.modelBase64) continue;
+
+        try {
+          const base64 = await FileSystem.readAsStringAsync(model.localFileUri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+
+          if (cancelled) return;
+
+          setModelContextMap((current) => ({
+            ...current,
+            [modelKey]: {
+              id: model.id,
+              name: model.name,
+              localFileUri: model.localFileUri,
+              thumbnail: model.thumbnail,
+              view_state: model.view_state ?? null,
+              modelBase64: base64,
+            },
+          }));
+          setModelContextVersion((current) => current + 1);
+        } catch (err) {
+          console.warn('[ReadingTab] preloadPageModelContexts failed:', model.localFileUri, err.message);
+        }
+      }
+    }
+
+    preloadPageModelContexts();
+    return () => { cancelled = true; };
+  }, [annotations, modelContextMap]);
 
   const goToPage = useCallback(
     (page) => {
@@ -185,8 +240,45 @@ export default function ReadingTab({ book }) {
           authToken={authToken}
           page={currentPage}
           annotations={annotations}
+          modelContextMap={modelContextMap}
+          modelContextVersion={modelContextVersion}
           onPageLoaded={handlePageLoaded}
           onHotspotClick={handleHotspotClick}
+          onRequestModelContext={async (modelId) => {
+            if (modelId == null) return null;
+
+            const cached = modelContextMap[String(modelId)] || modelContextMap[modelId] || null;
+            if (cached?.modelBase64) return cached;
+
+            const matchedAnnotation = annotations.find((annotation) => String(annotation.model_id) === String(modelId));
+            const model = matchedAnnotation?.model || null;
+            if (!model?.localFileUri) return cached;
+
+            try {
+              const base64 = await FileSystem.readAsStringAsync(model.localFileUri, {
+                encoding: FileSystem.EncodingType.Base64,
+              });
+
+              const context = {
+                id: model.id,
+                name: model.name,
+                localFileUri: model.localFileUri,
+                thumbnail: model.thumbnail,
+                view_state: model.view_state ?? null,
+                modelBase64: base64,
+              };
+
+              setModelContextMap((current) => ({
+                ...current,
+                [String(model.id)]: context,
+              }));
+              setModelContextVersion((current) => current + 1);
+              return context;
+            } catch (err) {
+              console.warn('[ReadingTab] onRequestModelContext failed:', model.localFileUri, err.message);
+              return cached;
+            }
+          }}
           onError={handleError}
         />
 
@@ -220,8 +312,20 @@ export default function ReadingTab({ book }) {
       {/* 3D Model Modal */}
       <ModelModal
         visible={!!selectedAnnotation}
-        model={selectedAnnotation?.model}
+        model={
+          selectedAnnotation?.model ||
+          (selectedAnnotation
+            ? {
+                id: selectedAnnotation.model_id,
+                name: selectedAnnotation.displayName || selectedAnnotation.label || '3D Model',
+                localFileUri: selectedAnnotation.modelUrl,
+                thumbnail: selectedAnnotation.thumbnailUrl,
+                view_state: selectedAnnotation.view_state ?? null,
+              }
+            : null)
+        }
         authToken={authToken}
+        onModelContextReady={handleModelContextReady}
         onClose={handleCloseModal}
         presentation="reader"
       />

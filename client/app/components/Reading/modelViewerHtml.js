@@ -10,10 +10,12 @@
  *   { type: 'loaded' }
  *   { type: 'error', message: '...' }
  */
-export default function getModelViewerHtml(modelUrl, authToken, initialViewState = null) {
+export default function getModelViewerHtml(modelUrl, authToken, initialViewState = null, modelBase64 = null) {
   console.log('[getModelViewerHtml] Called with initialViewState:', initialViewState);
+  console.log('[getModelViewerHtml] modelBase64 provided:', !!modelBase64, 'length:', modelBase64?.length);
   const viewStateStr = initialViewState ? JSON.stringify(initialViewState) : 'null';
   const modelUrlStr = JSON.stringify(modelUrl);
+  const base64DataStr = modelBase64 ? JSON.stringify(modelBase64) : 'null';
   const authHeaders = JSON.stringify(
     authToken ? { Authorization: `Bearer ${authToken}` } : {},
   );
@@ -251,12 +253,22 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
 
     async function fetchModelBlob(url) {
       const isLocalFile = url.startsWith('file://') || url.startsWith('content://');
+      console.log('[modelViewerHtml] fetchModelBlob url:', url);
+      console.log('[modelViewerHtml] isLocalFile:', isLocalFile);
+
       try {
         const resp = await fetch(url, isLocalFile ? undefined : { headers: ${authHeaders} });
         console.log('[modelViewerHtml] Fetch response status:', resp.status);
+        console.log('[modelViewerHtml] Fetch response ok:', resp.ok);
         if (!resp.ok && !isLocalFile) throw new Error('HTTP ' + resp.status);
         return resp.blob();
       } catch (err) {
+        console.error('[modelViewerHtml] fetchModelBlob error:', {
+          message: err.message,
+          name: err.name,
+          url,
+          isLocalFile,
+        });
         if (!isLocalFile) throw err;
         console.log('[modelViewerHtml] fetch local file failed, trying XHR:', err.message);
         return loadBlobWithXhr(url);
@@ -341,9 +353,24 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
     async function loadModel() {
       try {
         const modelUrl = ${modelUrlStr};
-        console.log('[modelViewerHtml] Starting model load from:', modelUrl);
-        const blob = await fetchModelBlob(modelUrl);
-        console.log('[modelViewerHtml] Model blob received, size:', blob.size, 'bytes');
+        const base64Data = ${base64DataStr};
+        let blob;
+
+        if (base64Data && base64Data.length > 0) {
+          console.log('[modelViewerHtml] Converting base64 to blob, length:', base64Data.length);
+          const binary = atob(base64Data);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          blob = new Blob([bytes.buffer], { type: 'model/gltf-binary' });
+          console.log('[modelViewerHtml] Base64 blob created, size:', blob.size, 'bytes');
+        } else {
+          console.log('[modelViewerHtml] No base64 data, fetching from URL:', modelUrl);
+          console.log('[modelViewerHtml] authHeaders present:', ${authToken ? 'true' : 'false'})
+          blob = await fetchModelBlob(modelUrl);
+          console.log('[modelViewerHtml] Model blob received, size:', blob.size, 'bytes');
+        }
         
         const blobUrl = URL.createObjectURL(blob);
         console.log('[modelViewerHtml] Blob URL created:', blobUrl);

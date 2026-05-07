@@ -89,7 +89,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       inset: 0;
       width: 100%;
       height: 100%;
-      background: #303030;
+      background: transparent;
       touch-action: none;
     }
     .hotspot-viewer canvas {
@@ -225,6 +225,9 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
     let legacyRuntimePromise = null;
     const modelBlobUrlCache = new Map();
     const modelBlobPromiseCache = new Map();
+      const modelContextCache = new Map();
+      const modelContextWaiters = new Map();
+      let inlineRequestSeq = 0;
 
     const viewerContainer = document.getElementById('viewer');
     const loadingOverlay = document.getElementById('loading-overlay');
@@ -286,7 +289,67 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       return threeRuntimePromise;
     }
 
+    function requestModelContextFromRN(ann) {
+      return new Promise((resolve) => {
+        const requestId = 'model-' + (ann?.model_id ?? ann?.id ?? 'unknown') + '-' + Date.now() + '-' + inlineRequestSeq++;
+        modelContextWaiters.set(requestId, resolve);
+        sendMessage({
+          type: 'requestModelContext',
+          requestId,
+          modelId: ann?.model_id ?? ann?.id ?? null,
+        });
+
+        setTimeout(() => {
+          if (modelContextWaiters.has(requestId)) {
+            modelContextWaiters.delete(requestId);
+            resolve(null);
+          }
+        }, 2500);
+      });
+    }
+
     async function getModelBlobUrl(ann) {
+      if (!ann) throw new Error('missing annotation');
+      const cachedContext = modelContextCache.get(String(ann.model_id ?? ann.id));
+      if (cachedContext?.modelBase64) {
+        const key = 'base64:' + String(ann.model_id ?? ann.id);
+        if (modelBlobUrlCache.has(key)) return modelBlobUrlCache.get(key);
+        const binary = atob(cachedContext.modelBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes.buffer], { type: 'model/gltf-binary' });
+        const url = URL.createObjectURL(blob);
+        modelBlobUrlCache.set(key, url);
+        return url;
+      }
+
+      const requestedContext = await requestModelContextFromRN(ann);
+      if (requestedContext?.modelBase64) {
+        modelContextCache.set(String(requestedContext.id), requestedContext);
+        const key = 'base64:' + String(requestedContext.id);
+        if (modelBlobUrlCache.has(key)) return modelBlobUrlCache.get(key);
+        const binary = atob(requestedContext.modelBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes.buffer], { type: 'model/gltf-binary' });
+        const url = URL.createObjectURL(blob);
+        modelBlobUrlCache.set(key, url);
+        return url;
+      }
+      // Prefer provided inline base64 data when available
+      if (ann.modelBase64) {
+        // Use cache key using a synthetic url
+        const key = 'base64:' + String(ann.id);
+        if (modelBlobUrlCache.has(key)) return modelBlobUrlCache.get(key);
+        const binary = atob(ann.modelBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes.buffer], { type: 'model/gltf-binary' });
+        const url = URL.createObjectURL(blob);
+        modelBlobUrlCache.set(key, url);
+        return url;
+      }
+
       if (!ann?.modelUrl) throw new Error('missing model URL');
       if (modelBlobUrlCache.has(ann.modelUrl)) return modelBlobUrlCache.get(ann.modelUrl);
       if (!modelBlobPromiseCache.has(ann.modelUrl)) {
@@ -324,9 +387,18 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       let runtime;
       try { runtime = await loadThreeRuntime(); } catch (e) { return; }
       const { THREE, OrbitControls, GLTFLoader } = runtime;
+      const thumb = rootEl.querySelector('.hotspot-thumb');
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(rootEl.clientWidth, rootEl.clientHeight);
+      // ensure canvas fills container and is positioned correctly
+      renderer.domElement.style.width = '100%';
+      renderer.domElement.style.height = '100%';
+      renderer.domElement.style.position = 'absolute';
+      renderer.domElement.style.top = '0';
+      renderer.domElement.style.left = '0';
+      renderer.domElement.style.zIndex = '2';
+      renderer.domElement.style.display = 'block';
       rootEl.appendChild(renderer.domElement);
       const scene = new THREE.Scene();
       scene.background = new THREE.Color(0xe0e0e0);
@@ -341,7 +413,9 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       let stopped = false, raf;
       const animate = () => { if (!stopped) { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(animate); } };
       const loader = new GLTFLoader();
+      console.log('[pdfViewerHtml] initInlineModelViewer ann:', ann);
       getModelBlobUrl(ann).then(url => {
+        console.log('[pdfViewerHtml] initInlineModelViewer loading url:', url);
         loader.load(url, gltf => {
           const model = gltf.scene;
           const box = new THREE.Box3().setFromObject(model);
@@ -363,10 +437,26 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
           camera.position.set(finalCenter.x + dist * 0.24, finalCenter.y + dist * 0.18, finalCenter.z + dist);
           camera.lookAt(finalCenter);
           controls.update();
-          const thumb = rootEl.querySelector('.hotspot-thumb');
           if (thumb) thumb.style.display = 'none';
+          try { rootEl.style.background = 'transparent'; } catch (e) {}
+          console.log('[pdfViewerHtml] Inline model loaded successfully for ann id:', ann.id);
           animate();
+        }, (progress) => {
+          // progress
+        }, (err) => {
+          console.error('[pdfViewerHtml] GLTFLoader inline error for ann', ann, err);
+          if (thumb) thumb.style.display = 'block';
         });
+        // Click on the inline viewer should open the modal (send hotspotClick)
+        try {
+          renderer.domElement.style.cursor = 'pointer';
+          renderer.domElement.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            sendMessage({ type: 'hotspotClick', annotation: ann });
+          });
+        } catch (e) { /* ignore */ }
+      }).catch(err => {
+        console.error('[pdfViewerHtml] getModelBlobUrl failed for ann', ann, err);
       });
       inlineViewers.push(() => { stopped = true; cancelAnimationFrame(raf); controls.dispose(); renderer.dispose(); });
     }
@@ -527,6 +617,13 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
           const thumb = document.createElement('img');
           thumb.className = 'hotspot-thumb';
           thumb.src = ann.thumbnailUrl;
+          // Click thumbnail to initialize inline 3D viewer
+          thumb.style.cursor = 'pointer';
+          thumb.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // hide thumbnail and start inline viewer
+            try { initInlineModelViewer(viewerEl, ann); } catch (err) { console.error('initInlineModelViewer failed', err); }
+          });
           viewerEl.appendChild(thumb);
         }
 
@@ -537,8 +634,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
 
         layer.appendChild(div);
 
-        // Auto-initialize the inline viewer
-        initInlineModelViewer(viewerEl, ann);
+        // Note: inline viewer will be initialized when the thumbnail is clicked
       });
     }
 
@@ -559,6 +655,15 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
           // Refresh visible page's annotations if it's the one we just received
           const el = document.getElementById('page-' + pg);
           if (el && pageRenderState.get(pg)?.rendered) renderAnnotationsForPage(pg);
+          } else if (data.type === 'modelContextResponse') {
+            if (data.modelContext?.id != null) {
+              modelContextCache.set(String(data.modelContext.id), data.modelContext);
+            }
+            const waiter = modelContextWaiters.get(data.requestId);
+            if (waiter) {
+              modelContextWaiters.delete(data.requestId);
+              waiter(data.modelContext || null);
+            }
         }
       } catch (e) { }
     }

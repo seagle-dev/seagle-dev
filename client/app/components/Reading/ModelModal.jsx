@@ -22,6 +22,8 @@ import {
   Platform,
   Pressable,
 } from 'react-native';
+// Use legacy API to avoid runtime deprecation/throwing behavior in current expo-file-system
+import * as FileSystem from 'expo-file-system/legacy';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../../constants/theme';
@@ -32,14 +34,27 @@ const ModelModal = memo(function ModelModal({
   visible,
   model,
   authToken,
+  onModelContextReady,
   onClose,
   presentation = 'full',
 }) {
   const [selectedPart, setSelectedPart] = useState(null);
+  const [modelBase64, setModelBase64] = useState(null);
   const iframeRef = useRef(null);
   const isReaderPresentation = presentation === 'reader';
 
   const modelUrl = model?.localFileUri || (model?.id ? getModelFileUrl(model.id) : null);
+
+  useEffect(() => {
+    if (visible) {
+      console.log('[ModelModal] visible:', visible);
+      console.log('[ModelModal] model:', model);
+      console.log('[ModelModal] modelUrl:', modelUrl);
+      console.log('[ModelModal] localFileUri exists?', !!model?.localFileUri);
+      console.log('[ModelModal] model id:', model?.id);
+      console.log('[ModelModal] viewState:', viewState);
+    }
+  }, [visible, model, modelUrl, viewState]);
 
   // Debug: confirm the viewer receives the saved orientation payload.
   const viewState = model?.view_state ?? model?.viewState ?? null;
@@ -51,10 +66,44 @@ const ModelModal = memo(function ModelModal({
     }
   }, [visible, model]);
 
+  // Read GLB file as base64 to bypass WebView filesystem sandbox on iOS
+  useEffect(() => {
+    setModelBase64(null);
+    if (!model?.localFileUri) return;
+
+    async function readModelAsBase64() {
+      try {
+        console.log('[ModelModal] Reading GLB as base64 from:', model.localFileUri);
+        console.log('[ModelModal] FileSystem available:', !!FileSystem);
+        console.log('[ModelModal] readAsStringAsync available:', !!FileSystem.readAsStringAsync);
+
+        const base64 = await FileSystem.readAsStringAsync(model.localFileUri, {
+          encoding: 'base64',
+        });
+        console.log('[ModelModal] base64 read success, length:', base64.length);
+        console.log('[ModelModal] Base64 length:', base64.length, 'model:', model?.id);
+        setModelBase64(base64);
+        onModelContextReady?.({
+          id: model.id,
+          name: model.name,
+          localFileUri: model.localFileUri,
+          thumbnail: model.thumbnail,
+          view_state: model.view_state ?? null,
+          modelBase64: base64,
+        });
+      } catch (err) {
+        console.error('[ModelModal] File read failed, will fall back to remote URL:', err);
+        setModelBase64(null);
+      }
+    }
+
+    readModelAsBase64();
+  }, [model?.localFileUri, model?.id, model?.name, model?.thumbnail, model?.view_state, onModelContextReady]);
+
   const html = useMemo(() => {
     if (!modelUrl) return null;
-    return getModelViewerHtml(modelUrl, authToken, viewState);
-  }, [modelUrl, authToken, viewState]);
+    return getModelViewerHtml(modelUrl, authToken, viewState, modelBase64);
+  }, [modelUrl, authToken, viewState, modelBase64]);
 
   const handleMessage = useCallback((event) => {
     try {
@@ -120,7 +169,10 @@ const ModelModal = memo(function ModelModal({
                 <WebView
                   source={{ html }}
                   style={styles.webView}
-                  originWhitelist={['*']}
+                  allowFileAccess={true}
+                  allowFileAccessFromFileURLs={true}
+                  allowUniversalAccessFromFileURLs={true}
+                  originWhitelist={['*', 'file://']}
                   javaScriptEnabled
                   domStorageEnabled
                   allowFileAccess
@@ -190,7 +242,10 @@ const ModelModal = memo(function ModelModal({
               <WebView
                 source={{ html }}
                 style={styles.webView}
-                originWhitelist={['*']}
+                allowFileAccess={true}
+                allowFileAccessFromFileURLs={true}
+                allowUniversalAccessFromFileURLs={true}
+                originWhitelist={['*', 'file://']}
                 javaScriptEnabled
                 domStorageEnabled
                 allowFileAccess
