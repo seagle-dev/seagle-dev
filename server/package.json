@@ -13,6 +13,7 @@
   "type": "commonjs",
   "description": "",
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.3",
     "bcrypt": "^6.0.0",
     "canvas": "^3.2.1",
     "cors": "^2.8.6",

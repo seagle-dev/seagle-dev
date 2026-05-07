@@ -211,3 +211,27 @@ export async function ensureOfflineBookMapping(bookId, { force = false } = {}) {
 export function getPageMappings(lookup, pageNumber) {
   return lookup?.pages?.[String(pageNumber)] ?? [];
 }
+
+/**
+ * Clear all offline cached data (mappings + model files)
+ * Call this when switching storage backends (Firebase → Supabase)
+ */
+export async function clearOfflineCache() {
+  if (!CACHE_ROOT) {
+    console.log('[offlineCache] No CACHE_ROOT, nothing to clear');
+    return;
+  }
+
+  try {
+    const info = await FileSystem.getInfoAsync(CACHE_ROOT);
+    if (info.exists) {
+      await FileSystem.deleteAsync(CACHE_ROOT, { idempotent: true });
+      console.log('[offlineCache] ✓ Cleared all offline cache');
+    } else {
+      console.log('[offlineCache] Cache already empty');
+    }
+  } catch (err) {
+    console.error('[offlineCache] Error clearing cache:', err.message);
+    throw err;
+  }
+}

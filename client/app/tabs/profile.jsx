@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { fetchProfile } from '../../services/api';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
+import CacheDebugPanel from '../components/CacheDebugPanel';
 
 export default function ProfileScreen() {
   const { user: authUser, signOut } = useAuth();
@@ -74,6 +75,11 @@ export default function ProfileScreen() {
         <ProfileItem icon="color-palette-outline" label="Appearance" />
         <ProfileItem icon="language-outline" label="Language" />
         <ProfileItem icon="help-circle-outline" label="Help & Support" />
+      </View>
+
+      {/* Cache Debug Panel */}
+      <View style={{ marginHorizontal: SPACING.lg, marginBottom: SPACING.md }}>
+        <CacheDebugPanel />
       </View>
 
       {/* Logout */}
