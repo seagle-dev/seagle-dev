@@ -1,76 +1,41 @@
-const admin = require('../config/firebase');
+// server/src/services/storage.service.js
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-
-function getBucket() {
-  return admin.storage().bucket();
-}
+const { supabase, bucketName } = require('../config/supabase');
 
 /**
- * Extract clean GCS path from a value that might be a full URL or a clean path.
- */
-function extractGcsPath(value) {
-  if (!value) return null;
-
-  // Already a clean path (no http)
-  if (!value.startsWith('http')) {
-    return value;
-  }
-
-  // Handle: https://storage.googleapis.com/BUCKET/path/to/file?query...
-  if (value.includes('storage.googleapis.com/')) {
-    const bucket = getBucket();
-    const prefix = `https://storage.googleapis.com/${bucket.name}/`;
-    if (value.startsWith(prefix)) {
-      const pathWithQuery = value.slice(prefix.length);
-      return decodeURIComponent(pathWithQuery.split('?')[0]);
-    }
-    const match = value.match(/storage\.googleapis\.com\/[^/]+\/(.+?)(\?|$)/);
-    if (match) {
-      return decodeURIComponent(match[1]);
-    }
-  }
-
-  // Handle: https://firebasestorage.googleapis.com/v0/b/BUCKET/o/encoded%2Fpath?alt=media&token=...
-  if (value.includes('firebasestorage.googleapis.com')) {
-    const match = value.match(/\/o\/(.+?)(\?|$)/);
-    if (match) {
-      return decodeURIComponent(match[1]);
-    }
-  }
-
-  return value;
-}
-
-/**
- * Upload a buffer to Firebase Storage and return the internal GCS path (not a signed URL).
- * The path is stored in the DB; files are served via backend proxy.
+ * Upload a buffer to Supabase Storage and return the file path.
  * @param {Buffer} buffer - File content
  * @param {string} destPath - Path in bucket, e.g. 'books/pdf/abc.pdf'
  * @param {string} contentType - MIME type
- * @returns {Promise<string>} The GCS object path (e.g. 'books/pdf/abc.pdf')
+ * @returns {Promise<string>} The file path (e.g. 'books/pdf/abc.pdf')
  */
 async function uploadBuffer(buffer, destPath, contentType) {
-  const bucket = getBucket();
-  const file = bucket.file(destPath);
+  try {
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .upload(destPath, buffer, {
+        contentType,
+        upsert: false,
+      });
 
-  await file.save(buffer, {
-    metadata: {
-      contentType,
-    },
-    resumable: false,
-  });
+    if (error) {
+      throw new Error(`Supabase upload error: ${error.message}`);
+    }
 
-  // Return the GCS path — NOT a signed URL
-  // Files will be served through our Express proxy
-  return destPath;
+    console.log('Uploaded to Supabase:', destPath);
+    return destPath;
+  } catch (err) {
+    console.error('uploadBuffer error:', err.message);
+    throw err;
+  }
 }
 
 /**
- * Upload a multer file to Firebase Storage.
+ * Upload a multer file to Supabase Storage.
  * @param {object} file - Multer file with .buffer, .originalname, .mimetype
  * @param {string} folder - Destination folder, e.g. 'books/pdf'
- * @returns {Promise<string>} The GCS object path
+ * @returns {Promise<string>} The file path
  */
 async function uploadFile(file, folder) {
   const ext = path.extname(file.originalname).toLowerCase();
@@ -80,64 +45,82 @@ async function uploadFile(file, folder) {
 }
 
 /**
- * Download a file from GCS and return its contents as a Buffer.
- * Handles both clean GCS paths and legacy signed URLs.
+ * Download a file from Supabase and return its contents as a Buffer.
  */
-async function getFileBuffer(gcsPathOrUrl) {
-  const gcsPath = extractGcsPath(gcsPathOrUrl);
-  if (!gcsPath) return null;
+async function getFileBuffer(filePath) {
+  if (!filePath) return null;
 
   try {
-    const bucket = getBucket();
-    const file = bucket.file(gcsPath);
-    const [buffer] = await file.download();
-    return buffer;
-  } catch (err) {
-    console.error('getFileBuffer error for', gcsPath, ':', err.message);
-    return null;
-  }
-}
-/**
- * Stream a file from GCS.
- * @param {string} gcsPath - The object path in GCS (e.g. 'books/pdf/abc.pdf')
- * @returns {{ stream: ReadableStream, file: File }} The readable stream and file reference
- */
-async function getFileStream(gcsPath) {
-  const bucket = getBucket();
-  const file = bucket.file(gcsPath);
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .download(filePath);
 
-  const [exists] = await file.exists();
-  if (!exists) {
-    return null;
-  }
-
-  const [metadata] = await file.getMetadata();
-  const stream = file.createReadStream();
-
-  return {
-    stream,
-    contentType: metadata.contentType || 'application/octet-stream',
-    size: metadata.size ? parseInt(metadata.size, 10) : undefined,
-  };
-}
-
-/**
- * Delete a file from Firebase Storage by its GCS path.
- * @param {string} gcsPath - The object path (e.g. 'books/pdf/abc.pdf')
- */
-async function deleteFileByPath(gcsPath) {
-  if (!gcsPath) return;
-  try {
-    const bucket = getBucket();
-    const file = bucket.file(gcsPath);
-    const [exists] = await file.exists();
-    if (exists) {
-      await file.delete();
-      console.log('Deleted from GCS:', gcsPath);
+    if (error) {
+      console.error('getFileBuffer error for', filePath, ':', error.message);
+      return null;
     }
+
+    // Convert Blob to Buffer
+    const arrayBuffer = await data.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (err) {
+    console.error('getFileBuffer error for', filePath, ':', err.message);
+    return null;
+  }
+}
+
+/**
+ * Stream a file from Supabase.
+ * @param {string} filePath - The file path in Supabase (e.g. 'books/pdf/abc.pdf')
+ * @returns {{ stream: ReadableStream, contentType, size }} The readable stream and metadata
+ */
+async function getFileStream(filePath) {
+  try {
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .download(filePath);
+
+    if (error) {
+      console.error('getFileStream error for', filePath, ':', error.message);
+      return null;
+    }
+
+    // Create a readable stream from the blob
+    const { Readable } = require('stream');
+    const stream = Readable.from(data.stream());
+
+    return {
+      stream,
+      contentType: data.type || 'application/octet-stream',
+      size: data.size,
+    };
+  } catch (err) {
+    console.error('getFileStream error for', filePath, ':', err.message);
+    return null;
+  }
+}
+
+/**
+ * Delete a file from Supabase Storage by its path.
+ * @param {string} filePath - The file path (e.g. 'books/pdf/abc.pdf')
+ */
+async function deleteFileByPath(filePath) {
+  if (!filePath) return;
+
+  try {
+    const { error } = await supabase.storage
+      .from(bucketName)
+      .remove([filePath]);
+
+    if (error) {
+      console.warn('Failed to delete from Supabase:', error.message);
+      return;
+    }
+
+    console.log('Deleted from Supabase:', filePath);
   } catch (err) {
     console.warn('Failed to delete from storage:', err.message);
   }
 }
 
-module.exports = { uploadBuffer, uploadFile, getFileStream, getFileBuffer, deleteFileByPath, getBucket };
+module.exports = { uploadBuffer, uploadFile, getFileStream, getFileBuffer, deleteFileByPath };
