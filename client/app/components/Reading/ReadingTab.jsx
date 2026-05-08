@@ -12,7 +12,7 @@
  *   - Page navigation (prev / next / direct input)
  *   - Floating annotation list sidebar
  */
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -45,9 +45,14 @@ export default function ReadingTab({ book }) {
   const [selectedAnnotation, setSelectedAnnotation] = useState(null);
   const [modelContextMap, setModelContextMap] = useState({});
   const [modelContextVersion, setModelContextVersion] = useState(0);
+  const modelContextMapRef = useRef({});
 
   const bookId = book?.id;
   const pdfUrl = bookId ? getBookPdfUrl(bookId) : null;
+
+  useEffect(() => {
+    modelContextMapRef.current = modelContextMap;
+  }, [modelContextMap]);
 
   // Debug: confirm the exact PDF URL handed to the WebView reader.
   useEffect(() => {
@@ -120,15 +125,35 @@ export default function ReadingTab({ book }) {
     setSelectedAnnotation(null);
   }, []);
 
-  const handleModelContextReady = useCallback((modelContext) => {
+  const storeModelContext = useCallback((modelContext) => {
     if (!modelContext?.id) return;
 
-    setModelContextMap((current) => ({
-      ...current,
-      [String(modelContext.id)]: modelContext,
-    }));
-    setModelContextVersion((current) => current + 1);
+    const key = String(modelContext.id);
+    const existing = modelContextMapRef.current[key];
+    const existingBase64Length = existing?.modelBase64?.length ?? 0;
+    const nextBase64Length = modelContext?.modelBase64?.length ?? 0;
+    const unchanged =
+      existing &&
+      existing.localFileUri === modelContext.localFileUri &&
+      existing.thumbnail === modelContext.thumbnail &&
+      existing.name === modelContext.name &&
+      existingBase64Length === nextBase64Length &&
+      JSON.stringify(existing.view_state ?? null) === JSON.stringify(modelContext.view_state ?? null);
+
+    if (unchanged) return;
+
+    const next = {
+      ...modelContextMapRef.current,
+      [key]: modelContext,
+    };
+    modelContextMapRef.current = next;
+    setModelContextMap(next);
+    setModelContextVersion((version) => version + 1);
   }, []);
+
+  const handleModelContextReady = useCallback((modelContext) => {
+    storeModelContext(modelContext);
+  }, [storeModelContext]);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,7 +167,7 @@ export default function ReadingTab({ book }) {
 
       for (const model of pageModels) {
         const modelKey = String(model.id);
-        if (modelContextMap[modelKey]?.modelBase64) continue;
+        if (modelContextMapRef.current[modelKey]?.modelBase64) continue;
 
         try {
           const base64 = await FileSystem.readAsStringAsync(model.localFileUri, {
@@ -151,18 +176,14 @@ export default function ReadingTab({ book }) {
 
           if (cancelled) return;
 
-          setModelContextMap((current) => ({
-            ...current,
-            [modelKey]: {
-              id: model.id,
-              name: model.name,
-              localFileUri: model.localFileUri,
-              thumbnail: model.thumbnail,
-              view_state: model.view_state ?? null,
-              modelBase64: base64,
-            },
-          }));
-          setModelContextVersion((current) => current + 1);
+          storeModelContext({
+            id: model.id,
+            name: model.name,
+            localFileUri: model.localFileUri,
+            thumbnail: model.thumbnail,
+            view_state: model.view_state ?? null,
+            modelBase64: base64,
+          });
         } catch (err) {
           console.warn('[ReadingTab] preloadPageModelContexts failed:', model.localFileUri, err.message);
         }
@@ -171,7 +192,7 @@ export default function ReadingTab({ book }) {
 
     preloadPageModelContexts();
     return () => { cancelled = true; };
-  }, [annotations, modelContextMap]);
+  }, [annotations, storeModelContext]);
 
   const goToPage = useCallback(
     (page) => {
@@ -268,11 +289,7 @@ export default function ReadingTab({ book }) {
                 modelBase64: base64,
               };
 
-              setModelContextMap((current) => ({
-                ...current,
-                [String(model.id)]: context,
-              }));
-              setModelContextVersion((current) => current + 1);
+              storeModelContext(context);
               return context;
             } catch (err) {
               console.warn('[ReadingTab] onRequestModelContext failed:', model.localFileUri, err.message);

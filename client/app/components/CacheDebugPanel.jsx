@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SPACING, RADIUS } from '../../constants/theme';
-import { clearOfflineCache } from '../services/offlineLibraryCache';
+import { clearOfflineCache } from '../../services/offlineLibraryCache';
 
 export default function CacheDebugPanel() {
   const [loading, setLoading] = useState(false);

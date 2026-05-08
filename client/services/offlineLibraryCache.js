@@ -5,7 +5,7 @@ import {
   getModelFileUrl,
   getModelThumbnailUrl,
   getToken,
-} from '../../services/api';
+} from './api';
 
 const CACHE_ROOT = FileSystem.documentDirectory
   ? `${FileSystem.documentDirectory}Seagle/`

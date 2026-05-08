@@ -73,14 +73,18 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       cursor: default;
       border: 0;
       border-radius: 4px;
-      background: #303030;
+      background: transparent;
       display: block;
       transition: transform 0.18s ease, box-shadow 0.18s ease;
       overflow: hidden;
+      box-shadow: none;
+    }
+    .hotspot.is-3d-active {
+      background: #303030;
       box-shadow: 0 2px 6px rgba(0,0,0,0.14);
     }
-    .hotspot:hover,
-    .hotspot:active {
+    .hotspot.is-3d-active:hover,
+    .hotspot.is-3d-active:active {
       transform: translateY(-1px);
       box-shadow: 0 5px 14px rgba(0,0,0,0.18);
     }
@@ -92,6 +96,12 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       background: transparent;
       touch-action: none;
       overscroll-behavior: contain;
+      display: none;
+      pointer-events: none;
+    }
+    .hotspot.is-3d-active .hotspot-viewer {
+      display: block;
+      pointer-events: auto;
     }
     .hotspot-viewer canvas {
       position: relative;
@@ -157,6 +167,30 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       padding: 4px 6px;
       line-height: 1;
       cursor: pointer;
+      display: none;
+    }
+    .hotspot.is-3d-active .hotspot-open {
+      display: block;
+    }
+    .hotspot-toggle {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      z-index: 5;
+      min-width: 34px;
+      height: 24px;
+      border: 1px solid rgba(255,255,255,0.9);
+      border-radius: 12px;
+      background: rgba(17, 26, 80, 0.82);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.22);
+    }
+    .hotspot.is-3d-active .hotspot-toggle {
+      background: rgba(255, 140, 66, 0.92);
     }
     .hotspot-fallback {
       position: absolute;
@@ -234,9 +268,11 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
     let totalPages = 0;
     let lastReportedPage = null;
     let currentAnnotationsMap = new Map(); // pageNum -> annotations[]
+    const pageAnnotationSignatures = new Map();
     const pageRenderState = new Map(); // pageNum -> { rendering: bool, rendered: bool }
     const inlineViewers = [];
     const activeInlineViewerCleanups = new Map();
+    const activeInlineViewerKeys = new Set();
     const inlineViewStateCache = new Map();
     let threeRuntimePromise = null;
     let legacyRuntimePromise = null;
@@ -267,6 +303,28 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
 
     function getInlineViewerKey(ann) {
       return String(ann?.id ?? ann?.model_id ?? ann?.modelUrl ?? 'unknown');
+    }
+
+    function stopInlineModelViewer(viewerKey) {
+      const cleanup = activeInlineViewerCleanups.get(viewerKey);
+      if (cleanup) cleanup();
+    }
+
+    function getAnnotationRenderSignature(annotations) {
+      return JSON.stringify((annotations || []).map((ann) => ({
+        id: ann?.id,
+        model_id: ann?.model_id,
+        x: ann?.x,
+        y: ann?.y,
+        width: ann?.width,
+        height: ann?.height,
+        label: ann?.label,
+        displayName: ann?.displayName,
+        modelUrl: ann?.modelUrl,
+        thumbnailUrl: ann?.thumbnailUrl,
+        view_state: ann?.view_state ?? null,
+        modelBase64Length: ann?.modelBase64?.length ?? 0,
+      })));
     }
 
     function isFiniteNumber(value) {
@@ -427,6 +485,10 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       if (existingCleanup) existingCleanup();
 
       const statusEl = rootEl.querySelector('.hotspot-status');
+      if (statusEl) {
+        statusEl.textContent = 'Loading 3D model...';
+        statusEl.style.display = 'flex';
+      }
       let runtime;
       try {
         runtime = await loadThreeRuntime();
@@ -437,6 +499,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       }
       const { THREE, OrbitControls, GLTFLoader } = runtime;
       const thumb = rootEl.querySelector('.hotspot-thumb');
+      if (thumb) thumb.style.display = 'block';
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(rootEl.clientWidth, rootEl.clientHeight);
@@ -567,6 +630,8 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         cancelAnimationFrame(raf);
         controls.dispose();
         renderer.dispose();
+        try { renderer.domElement.remove(); } catch (e) {}
+        rootEl.dataset.viewerStarted = 'false';
         activeInlineViewerCleanups.delete(viewerKey);
       };
       activeInlineViewerCleanups.set(viewerKey, cleanup);
@@ -691,6 +756,11 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       if (!container) return;
       const layer = container.querySelector('.annotations-layer');
       const annotations = currentAnnotationsMap.get(pageNum) || [];
+      const signature = getAnnotationRenderSignature(annotations);
+      if (pageAnnotationSignatures.get(pageNum) === signature && layer.children.length > 0) {
+        return;
+      }
+      pageAnnotationSignatures.set(pageNum, signature);
 
       layer.querySelectorAll('.hotspot').forEach((hotspot) => {
         const cleanup = activeInlineViewerCleanups.get(hotspot.dataset.inlineViewerKey);
@@ -698,9 +768,13 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       });
       layer.innerHTML = '';
       annotations.forEach(ann => {
+        const viewerKey = getInlineViewerKey(ann);
         const div = document.createElement('div');
         div.className = 'hotspot';
-        div.dataset.inlineViewerKey = getInlineViewerKey(ann);
+        div.dataset.inlineViewerKey = viewerKey;
+        if (activeInlineViewerKeys.has(viewerKey)) {
+          div.classList.add('is-3d-active');
+        }
         div.style.left = (ann.x * 100) + '%';
         div.style.top = (ann.y * 100) + '%';
         div.style.width = (ann.width * 100) + '%';
@@ -711,7 +785,29 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         viewerEl.innerHTML = '<div class="hotspot-status">Loading 3D model...</div>';
         div.appendChild(viewerEl);
 
-        // Small open affordance only; the model canvas remains draggable.
+        const toggleButton = document.createElement('button');
+        toggleButton.type = 'button';
+        toggleButton.className = 'hotspot-toggle';
+        toggleButton.setAttribute('aria-label', activeInlineViewerKeys.has(viewerKey) ? 'Show original image' : 'Show 3D model');
+        toggleButton.textContent = activeInlineViewerKeys.has(viewerKey) ? '2D' : '3D';
+        toggleButton.onclick = (e) => {
+          e.stopPropagation();
+          const enabled = !div.classList.contains('is-3d-active');
+          div.classList.toggle('is-3d-active', enabled);
+          toggleButton.textContent = enabled ? '2D' : '3D';
+          toggleButton.setAttribute('aria-label', enabled ? 'Show original image' : 'Show 3D model');
+
+          if (enabled) {
+            activeInlineViewerKeys.add(viewerKey);
+            try { initInlineModelViewer(viewerEl, ann); } catch (err) { console.error('initInlineModelViewer failed', err); }
+          } else {
+            activeInlineViewerKeys.delete(viewerKey);
+            stopInlineModelViewer(viewerKey);
+          }
+        };
+        div.appendChild(toggleButton);
+
+        // Visible only after the inline 3D preview is enabled.
         const openButton = document.createElement('button');
         openButton.type = 'button';
         openButton.className = 'hotspot-open';
@@ -737,7 +833,9 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
 
         layer.appendChild(div);
 
-        try { initInlineModelViewer(viewerEl, ann); } catch (err) { console.error('initInlineModelViewer failed', err); }
+        if (activeInlineViewerKeys.has(viewerKey)) {
+          try { initInlineModelViewer(viewerEl, ann); } catch (err) { console.error('initInlineModelViewer failed', err); }
+        }
       });
     }
 

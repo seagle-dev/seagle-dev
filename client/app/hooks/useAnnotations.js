@@ -12,7 +12,7 @@ import {
   ensureOfflineBookMapping,
   getPageMappings,
   readOfflineBookMapping,
-} from '../services/offlineLibraryCache';
+} from '../../services/offlineLibraryCache';
 
 export default function useAnnotations(bookId, currentPage, enabled = true) {
   const [lookup, setLookup] = useState(null);
@@ -107,4 +107,3 @@ export default function useAnnotations(bookId, currentPage, enabled = true) {
     invalidatePage,
   };
 }
-
