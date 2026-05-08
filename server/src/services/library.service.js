@@ -1,8 +1,10 @@
 const db = require('../config/db');
+const { parsePositiveInt } = require('../utils/request');
+const { normalizeViewState } = require('../utils/viewState');
 
 async function listBooks({ search, category, page = 1, limit = 10, sort = 'newest' }) {
-  const limitInt = Number.isFinite(Number(limit)) ? Math.max(1, Number(limit)) : 10;
-  const pageInt = Number.isFinite(Number(page)) ? Math.max(1, Number(page)) : 1;
+  const limitInt = parsePositiveInt(limit, 10);
+  const pageInt = parsePositiveInt(page, 1);
   const offset = (pageInt - 1) * limitInt;
 
   const where = ['b.pdf_url IS NOT NULL'];
@@ -68,8 +70,8 @@ async function listBooks({ search, category, page = 1, limit = 10, sort = 'newes
 }
 
 async function listModels({ search, category, page = 1, limit = 10 }) {
-  const limitInt = Number.isFinite(Number(limit)) ? Math.max(1, Number(limit)) : 10;
-  const pageInt = Number.isFinite(Number(page)) ? Math.max(1, Number(page)) : 1;
+  const limitInt = parsePositiveInt(limit, 10);
+  const pageInt = parsePositiveInt(page, 1);
   const offset = (pageInt - 1) * limitInt;
 
   const where = ['m.file_url IS NOT NULL'];
@@ -100,19 +102,6 @@ async function listModels({ search, category, page = 1, limit = 10 }) {
   const execParams = params.slice();
 
   const [rows] = await db.execute(selectSql, execParams);
-
-  const normalizeViewState = (raw) => {
-    if (!raw) return null;
-    if (typeof raw === 'object') return raw;
-    if (typeof raw === 'string') {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  };
 
   const data = rows.map(r => ({
     id: r.id,
@@ -155,19 +144,6 @@ async function getMappings(bookId, pageNumber) {
   `;
   const [rows] = await db.execute(sql, [bookId, pageNumber]);
 
-  const normalizeViewState = (raw) => {
-    if (!raw) return null;
-    if (typeof raw === 'object') return raw;
-    if (typeof raw === 'string') {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  };
-
   return rows.map((row) => ({
     ...row,
     model_view_state: normalizeViewState(row.model_view_state),
@@ -200,19 +176,6 @@ async function getBookMappings(bookId) {
     ORDER BY m.page_number, m.id
   `;
   const [rows] = await db.execute(sql, [bookId]);
-
-  const normalizeViewState = (raw) => {
-    if (!raw) return null;
-    if (typeof raw === 'object') return raw;
-    if (typeof raw === 'string') {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  };
 
   return rows.map((row) => ({
     ...row,

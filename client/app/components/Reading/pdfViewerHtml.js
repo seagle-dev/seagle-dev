@@ -91,10 +91,12 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       height: 100%;
       background: transparent;
       touch-action: none;
+      overscroll-behavior: contain;
     }
     .hotspot-viewer canvas {
       position: relative;
       z-index: 2;
+      touch-action: none;
     }
     .hotspot-thumb {
       position: absolute;
@@ -169,6 +171,19 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       text-align: center;
       padding: 4px;
     }
+    .hotspot-status {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #e8e8e8;
+      color: #666;
+      font-size: 11px;
+      text-align: center;
+      padding: 8px;
+    }
     #loading-overlay {
       position: fixed;
       inset: 0;
@@ -221,6 +236,8 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
     let currentAnnotationsMap = new Map(); // pageNum -> annotations[]
     const pageRenderState = new Map(); // pageNum -> { rendering: bool, rendered: bool }
     const inlineViewers = [];
+    const activeInlineViewerCleanups = new Map();
+    const inlineViewStateCache = new Map();
     let threeRuntimePromise = null;
     let legacyRuntimePromise = null;
     const modelBlobUrlCache = new Map();
@@ -245,6 +262,24 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         try { cleanup(); } catch (e) { }
       });
       inlineViewers.length = 0;
+      activeInlineViewerCleanups.clear();
+    }
+
+    function getInlineViewerKey(ann) {
+      return String(ann?.id ?? ann?.model_id ?? ann?.modelUrl ?? 'unknown');
+    }
+
+    function isFiniteNumber(value) {
+      return typeof value === 'number' && Number.isFinite(value);
+    }
+
+    function isValidInlineViewState(state) {
+      const cp = state?.cameraPosition;
+      const ct = state?.controlsTarget;
+      return (
+        isFiniteNumber(cp?.x) && isFiniteNumber(cp?.y) && isFiniteNumber(cp?.z) &&
+        isFiniteNumber(ct?.x) && isFiniteNumber(ct?.y) && isFiniteNumber(ct?.z)
+      );
     }
 
     // (Same THREE runtime loading functions as before...)
@@ -323,12 +358,11 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         return url;
       }
 
-      const requestedContext = await requestModelContextFromRN(ann);
-      if (requestedContext?.modelBase64) {
-        modelContextCache.set(String(requestedContext.id), requestedContext);
-        const key = 'base64:' + String(requestedContext.id);
+      // Prefer provided inline base64 data immediately; RN context can lag behind annotation delivery.
+      if (ann.modelBase64) {
+        const key = 'base64:' + String(ann.id);
         if (modelBlobUrlCache.has(key)) return modelBlobUrlCache.get(key);
-        const binary = atob(requestedContext.modelBase64);
+        const binary = atob(ann.modelBase64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         const blob = new Blob([bytes.buffer], { type: 'model/gltf-binary' });
@@ -336,12 +370,13 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         modelBlobUrlCache.set(key, url);
         return url;
       }
-      // Prefer provided inline base64 data when available
-      if (ann.modelBase64) {
-        // Use cache key using a synthetic url
-        const key = 'base64:' + String(ann.id);
+
+      const requestedContext = await requestModelContextFromRN(ann);
+      if (requestedContext?.modelBase64) {
+        modelContextCache.set(String(requestedContext.id), requestedContext);
+        const key = 'base64:' + String(requestedContext.id);
         if (modelBlobUrlCache.has(key)) return modelBlobUrlCache.get(key);
-        const binary = atob(ann.modelBase64);
+        const binary = atob(requestedContext.modelBase64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         const blob = new Blob([bytes.buffer], { type: 'model/gltf-binary' });
@@ -384,13 +419,28 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
     }
 
     async function initInlineModelViewer(rootEl, ann) {
+      if (!rootEl || rootEl.dataset.viewerStarted === 'true') return;
+      rootEl.dataset.viewerStarted = 'true';
+
+      const viewerKey = getInlineViewerKey(ann);
+      const existingCleanup = activeInlineViewerCleanups.get(viewerKey);
+      if (existingCleanup) existingCleanup();
+
+      const statusEl = rootEl.querySelector('.hotspot-status');
       let runtime;
-      try { runtime = await loadThreeRuntime(); } catch (e) { return; }
+      try {
+        runtime = await loadThreeRuntime();
+      } catch (e) {
+        if (statusEl) statusEl.textContent = 'Unable to load 3D runtime';
+        rootEl.dataset.viewerStarted = 'false';
+        return;
+      }
       const { THREE, OrbitControls, GLTFLoader } = runtime;
       const thumb = rootEl.querySelector('.hotspot-thumb');
-      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(rootEl.clientWidth, rootEl.clientHeight);
+      renderer.setClearColor(0xe8e8e8, 1);
       // ensure canvas fills container and is positioned correctly
       renderer.domElement.style.width = '100%';
       renderer.domElement.style.height = '100%';
@@ -399,13 +449,17 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       renderer.domElement.style.left = '0';
       renderer.domElement.style.zIndex = '2';
       renderer.domElement.style.display = 'block';
+      renderer.domElement.style.touchAction = 'none';
       rootEl.appendChild(renderer.domElement);
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xe0e0e0);
+      scene.background = new THREE.Color(0xe8e8e8);
       const camera = new THREE.PerspectiveCamera(45, rootEl.clientWidth / rootEl.clientHeight, 0.01, 100);
       camera.position.set(0, 0, 4);
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+      controls.minDistance = 0.5;
+      controls.maxDistance = 20;
       scene.add(new THREE.AmbientLight(0xffffff, 0.8));
       const light = new THREE.DirectionalLight(0xffffff, 0.9);
       light.position.set(5, 8, 6);
@@ -414,6 +468,54 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       const animate = () => { if (!stopped) { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(animate); } };
       const loader = new GLTFLoader();
       console.log('[pdfViewerHtml] initInlineModelViewer ann:', ann);
+
+      function saveInlineViewState() {
+        inlineViewStateCache.set(viewerKey, {
+          cameraPosition: {
+            x: camera.position.x,
+            y: camera.position.y,
+            z: camera.position.z,
+          },
+          controlsTarget: {
+            x: controls.target.x,
+            y: controls.target.y,
+            z: controls.target.z,
+          },
+          fov: camera.fov,
+        });
+      }
+
+      function restoreInlineViewState() {
+        const savedState = inlineViewStateCache.get(viewerKey);
+        if (!isValidInlineViewState(savedState)) return false;
+
+        if (isFiniteNumber(savedState.fov)) {
+          camera.fov = savedState.fov;
+          camera.updateProjectionMatrix();
+        }
+        controls.target.set(
+          savedState.controlsTarget.x,
+          savedState.controlsTarget.y,
+          savedState.controlsTarget.z,
+        );
+        camera.position.set(
+          savedState.cameraPosition.x,
+          savedState.cameraPosition.y,
+          savedState.cameraPosition.z,
+        );
+        camera.lookAt(controls.target);
+        controls.update();
+        return true;
+      }
+
+      controls.addEventListener?.('change', saveInlineViewState);
+
+      ['touchstart', 'touchmove', 'pointerdown', 'pointermove', 'wheel'].forEach((eventName) => {
+        renderer.domElement.addEventListener(eventName, (ev) => {
+          ev.stopPropagation();
+          if (eventName === 'touchmove' || eventName === 'wheel') ev.preventDefault();
+        }, { passive: false });
+      });
       getModelBlobUrl(ann).then(url => {
         console.log('[pdfViewerHtml] initInlineModelViewer loading url:', url);
         loader.load(url, gltf => {
@@ -433,11 +535,15 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
           const finalSize = finalBox.getSize(new THREE.Vector3());
           const fov = camera.fov * (Math.PI / 180);
           const dist = (Math.max(finalSize.x, finalSize.y, finalSize.z) / 2) / Math.tan(fov / 2) * 1.55;
-          controls.target.copy(finalCenter);
-          camera.position.set(finalCenter.x + dist * 0.24, finalCenter.y + dist * 0.18, finalCenter.z + dist);
-          camera.lookAt(finalCenter);
-          controls.update();
+          if (!restoreInlineViewState()) {
+            controls.target.copy(finalCenter);
+            camera.position.set(finalCenter.x + dist * 0.24, finalCenter.y + dist * 0.18, finalCenter.z + dist);
+            camera.lookAt(finalCenter);
+            controls.update();
+            saveInlineViewState();
+          }
           if (thumb) thumb.style.display = 'none';
+          if (statusEl) statusEl.style.display = 'none';
           try { rootEl.style.background = 'transparent'; } catch (e) {}
           console.log('[pdfViewerHtml] Inline model loaded successfully for ann id:', ann.id);
           animate();
@@ -446,19 +552,25 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         }, (err) => {
           console.error('[pdfViewerHtml] GLTFLoader inline error for ann', ann, err);
           if (thumb) thumb.style.display = 'block';
+          if (statusEl) statusEl.textContent = 'Unable to load 3D model';
+          rootEl.dataset.viewerStarted = 'false';
         });
-        // Click on the inline viewer should open the modal (send hotspotClick)
-        try {
-          renderer.domElement.style.cursor = 'pointer';
-          renderer.domElement.addEventListener('click', (ev) => {
-            ev.stopPropagation();
-            sendMessage({ type: 'hotspotClick', annotation: ann });
-          });
-        } catch (e) { /* ignore */ }
       }).catch(err => {
         console.error('[pdfViewerHtml] getModelBlobUrl failed for ann', ann, err);
+        if (statusEl) statusEl.textContent = 'Unable to load 3D model';
+        rootEl.dataset.viewerStarted = 'false';
       });
-      inlineViewers.push(() => { stopped = true; cancelAnimationFrame(raf); controls.dispose(); renderer.dispose(); });
+      const cleanup = () => {
+        if (stopped) return;
+        saveInlineViewState();
+        stopped = true;
+        cancelAnimationFrame(raf);
+        controls.dispose();
+        renderer.dispose();
+        activeInlineViewerCleanups.delete(viewerKey);
+      };
+      activeInlineViewerCleanups.set(viewerKey, cleanup);
+      inlineViewers.push(cleanup);
     }
 
     // ---- PDF Loading ----
@@ -579,11 +691,16 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       if (!container) return;
       const layer = container.querySelector('.annotations-layer');
       const annotations = currentAnnotationsMap.get(pageNum) || [];
-      
+
+      layer.querySelectorAll('.hotspot').forEach((hotspot) => {
+        const cleanup = activeInlineViewerCleanups.get(hotspot.dataset.inlineViewerKey);
+        if (cleanup) cleanup();
+      });
       layer.innerHTML = '';
       annotations.forEach(ann => {
         const div = document.createElement('div');
         div.className = 'hotspot';
+        div.dataset.inlineViewerKey = getInlineViewerKey(ann);
         div.style.left = (ann.x * 100) + '%';
         div.style.top = (ann.y * 100) + '%';
         div.style.width = (ann.width * 100) + '%';
@@ -591,39 +708,25 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
 
         const viewerEl = document.createElement('div');
         viewerEl.className = 'hotspot-viewer';
+        viewerEl.innerHTML = '<div class="hotspot-status">Loading 3D model...</div>';
         div.appendChild(viewerEl);
 
-        // Clickable overlay to trigger full-screen expansion
-        const overlay = document.createElement('div');
-        overlay.style.position = 'absolute';
-        overlay.style.inset = '0';
-        overlay.style.zIndex = '10';
-        overlay.style.cursor = 'pointer';
-        overlay.style.display = 'flex';
-        overlay.style.alignItems = 'flex-start';
-        overlay.style.justifyContent = 'flex-end';
-        overlay.style.padding = '5px';
-        overlay.innerHTML = \`
-          <div style="width: 24px; height: 8px; background: #FF8C42; border: 2px solid #fff; border-radius: 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.22);">
-          </div>
-        \`;
-        overlay.onclick = (e) => {
+        // Small open affordance only; the model canvas remains draggable.
+        const openButton = document.createElement('button');
+        openButton.type = 'button';
+        openButton.className = 'hotspot-open';
+        openButton.setAttribute('aria-label', 'Open model');
+        openButton.innerHTML = '<span style="display:block;width:24px;height:8px;background:#FF8C42;border:2px solid #fff;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,0.22);"></span>';
+        openButton.onclick = (e) => {
           e.stopPropagation();
           sendMessage({ type: 'hotspotClick', annotation: ann });
         };
-        div.appendChild(overlay);
+        div.appendChild(openButton);
 
         if (ann.thumbnailUrl) {
           const thumb = document.createElement('img');
           thumb.className = 'hotspot-thumb';
           thumb.src = ann.thumbnailUrl;
-          // Click thumbnail to initialize inline 3D viewer
-          thumb.style.cursor = 'pointer';
-          thumb.addEventListener('click', (e) => {
-            e.stopPropagation();
-            // hide thumbnail and start inline viewer
-            try { initInlineModelViewer(viewerEl, ann); } catch (err) { console.error('initInlineModelViewer failed', err); }
-          });
           viewerEl.appendChild(thumb);
         }
 
@@ -634,7 +737,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
 
         layer.appendChild(div);
 
-        // Note: inline viewer will be initialized when the thumbnail is clicked
+        try { initInlineModelViewer(viewerEl, ann); } catch (err) { console.error('initInlineModelViewer failed', err); }
       });
     }
 

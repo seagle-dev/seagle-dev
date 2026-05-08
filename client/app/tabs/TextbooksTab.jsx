@@ -6,7 +6,6 @@ import {
   FlatList,
   Image,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +16,8 @@ import usePaginatedList from '../hooks/usePaginatedList';
 import LoadingView from '../components/LoadingView';
 import EmptyState from '../components/EmptyState';
 import Badge from '../components/Badge';
+import PaginatedListFooter from '../components/PaginatedListFooter';
+import { PLACEHOLDER_BOOK_COVER } from '../../constants/placeholders';
 
 const mapBook = (b) => ({
   id: String(b.id),
@@ -26,7 +27,7 @@ const mapBook = (b) => ({
   category: b.category || 'General',
   image: b.coverImage
     ? getBookCoverUrl(b.id)
-    : 'https://via.placeholder.com/200x300?text=No+Cover',
+    : PLACEHOLDER_BOOK_COVER,
   readCount: b.readCount || 0,
   createdAt: b.createdAt,
   pdfUrl: b.pdfUrl,
@@ -102,12 +103,9 @@ export default function TextbooksTab({ search = '', category = null }) {
 
   const renderSeparator = () => <View style={styles.separator} />;
 
-  const renderFooter = () =>
-    loadingMore ? (
-      <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color={COLORS.navy} />
-      </View>
-    ) : null;
+  const renderFooter = useCallback(() => (
+    <PaginatedListFooter loading={loadingMore} />
+  ), [loadingMore]);
 
   if (loading) return <LoadingView message="Loading books..." />;
 
@@ -202,9 +200,5 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: COLORS.border,
     marginHorizontal: SPACING.lg,
-  },
-  footerLoader: {
-    paddingVertical: SPACING.xl,
-    alignItems: 'center',
   },
 });

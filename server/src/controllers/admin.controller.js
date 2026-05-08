@@ -1,7 +1,20 @@
 const adminService = require('../services/admin.service');
 const { getFileStream } = require('../services/storage.service');
+const asyncHandler = require('../utils/asyncHandler');
+const { requirePositiveInt } = require('../utils/request');
+const { getBookUrls, getModelUrls } = require('../utils/responseUrls');
+const { parseModelViewState } = require('../utils/viewState');
 
 // ==================== FILE STREAMING (PROXY) ====================
+
+function sendControllerError(res, err, fallbackMessage = 'Server error') {
+  if (res.headersSent) return;
+  const statusCode = err.statusCode || err.status || 500;
+  res.status(statusCode).json({
+    message: statusCode === 500 ? fallbackMessage : err.message,
+    ...(statusCode === 500 && err.message ? { error: err.message } : {}),
+  });
+}
 
 /**
  * Generic helper: stream a GCS file through Express.
@@ -42,118 +55,94 @@ async function streamGcsFile(gcsPath, res, fallbackContentType) {
 
 // ==================== BOOKS ====================
 
-async function getBooks(req, res) {
+const getBooks = asyncHandler(async (req, res) => {
   console.log('DEBUG: getBooks endpoint hit at', new Date().toISOString());
-  try {
-    const books = await adminService.listBooks();
-
-    // Convert GCS paths to proxy URLs for the frontend
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const booksWithUrls = (Array.isArray(books) ? books : []).map(book => ({
+  const books = await adminService.listBooks();
+  const booksWithUrls = (Array.isArray(books) ? books : []).map(book => {
+    const urls = getBookUrls(req, book.id);
+    return {
       ...book,
-      cover_image: book.cover_image ? `${baseUrl}/api/admin/books/${book.id}/cover` : null,
-      pdf_url: book.pdf_url ? `${baseUrl}/api/admin/books/${book.id}/pdf` : null,
-    }));
+      cover_image: book.cover_image ? urls.cover : null,
+      pdf_url: book.pdf_url ? urls.pdf : null,
+    };
+  });
 
-    return res.status(200).json({ data: booksWithUrls });
-  } catch (err) {
-    console.error('admin.getBooks error', err);
-    return res.status(500).json({ message: 'Server error', error: err.message });
-  }
-}
+  return res.status(200).json({ data: booksWithUrls });
+});
 
 async function getBookPdf(req, res) {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ message: 'Invalid book id' });
+    const id = requirePositiveInt(req.params.id, 'Invalid book id');
 
     const pdfPath = await adminService.getBookPdfPath(id);
     await streamGcsFile(pdfPath, res, 'application/pdf');
   } catch (err) {
     console.error('getBookPdf error', err);
-    if (!res.headersSent) {
-      res.status(500).json({ message: 'Server error' });
-    }
+    sendControllerError(res, err);
   }
 }
 
 async function getBookCover(req, res) {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ message: 'Invalid book id' });
+    const id = requirePositiveInt(req.params.id, 'Invalid book id');
 
     const coverPath = await adminService.getBookCoverPath(id);
     await streamGcsFile(coverPath, res, 'image/png');
   } catch (err) {
     console.error('getBookCover error', err);
-    if (!res.headersSent) {
-      res.status(500).json({ message: 'Server error' });
-    }
+    sendControllerError(res, err);
   }
 }
 
-async function uploadBook(req, res) {
-  try {
-    if (!req.file) return res.status(400).json({ message: 'PDF file is required' });
+const uploadBook = asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'PDF file is required' });
 
-    const { title, description, category } = req.body;
-    const result = await adminService.createBook({
-      title: title || req.file.originalname.replace(/\.pdf$/i, ''),
-      description,
-      category,
-      pdfFile: req.file,
-      uploadedBy: req.user?.id,
-    });
+  const { title, description, category } = req.body;
+  const result = await adminService.createBook({
+    title: title || req.file.originalname.replace(/\.pdf$/i, ''),
+    description,
+    category,
+    pdfFile: req.file,
+    uploadedBy: req.user?.id,
+  });
 
-    // Convert to proxy URLs in response
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    result.cover_image = result.cover_image ? `${baseUrl}/api/admin/books/${result.id}/cover` : null;
-    result.pdf_url = `${baseUrl}/api/admin/books/${result.id}/pdf`;
+  const urls = getBookUrls(req, result.id);
+  result.cover_image = result.cover_image ? urls.cover : null;
+  result.pdf_url = urls.pdf;
 
-    return res.status(201).json({ data: result });
-  } catch (err) {
-    console.error('uploadBook error', err);
-    return res.status(500).json({ message: 'Upload failed', error: err.message });
-  }
-}
+  return res.status(201).json({ data: result });
+});
 
 async function removeBook(req, res) {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ message: 'Invalid book id' });
+    const id = requirePositiveInt(req.params.id, 'Invalid book id');
     await adminService.deleteBook(id);
     return res.status(204).send();
   } catch (err) {
     console.error('removeBook error', err);
-    return res.status(500).json({ message: 'Server error', error: err.message });
+    return sendControllerError(res, err);
   }
 }
 
 // ==================== MODELS ====================
 
-async function getModels(req, res) {
-  try {
-    const models = await adminService.listModels();
-
-    // Convert GCS paths to proxy URLs
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const modelsWithUrls = models.map(model => ({
+const getModels = asyncHandler(async (req, res) => {
+  const models = await adminService.listModels();
+  const modelsWithUrls = models.map(model => {
+    const urls = getModelUrls(req, model.id);
+    return {
       ...model,
-      file_url: model.file_url ? `${baseUrl}/api/admin/models/${model.id}/file` : null,
-      thumbnail: model.thumbnail ? `${baseUrl}/api/admin/models/${model.id}/thumbnail` : null,
-    }));
+      file_url: model.file_url ? urls.file : null,
+      thumbnail: model.thumbnail ? urls.thumbnail : null,
+    };
+  });
 
-    res.json({ data: modelsWithUrls });
-  } catch (err) {
-    console.error('getModels error', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-}
+  res.json({ data: modelsWithUrls });
+});
 
 async function getModelFile(req, res) {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ message: 'Invalid model id' });
+    const id = requirePositiveInt(req.params.id, 'Invalid model id');
 
     const filePath = await adminService.getModelFilePath(id);
     if (!filePath) return res.status(404).json({ message: 'Model file not found' });
@@ -168,102 +157,63 @@ async function getModelFile(req, res) {
     await streamGcsFile(filePath, res, contentTypeMap[ext] || 'application/octet-stream');
   } catch (err) {
     console.error('getModelFile error', err);
-    if (!res.headersSent) {
-      res.status(500).json({ message: 'Server error' });
-    }
+    sendControllerError(res, err);
   }
 }
 
 async function getModelThumbnail(req, res) {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ message: 'Invalid model id' });
+    const id = requirePositiveInt(req.params.id, 'Invalid model id');
 
     const thumbPath = await adminService.getModelThumbnailPath(id);
     await streamGcsFile(thumbPath, res, 'image/png');
   } catch (err) {
     console.error('getModelThumbnail error', err);
-    if (!res.headersSent) {
-      res.status(500).json({ message: 'Server error' });
-    }
+    sendControllerError(res, err);
   }
 }
 
-async function uploadModel(req, res) {
-  try {
-    if (!req.file) return res.status(400).json({ message: '3D model file is required' });
+const uploadModel = asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: '3D model file is required' });
 
-    const { name, category } = req.body;
-    const result = await adminService.createModel({
-      name: name || req.file.originalname.replace(/\.(glb|gltf)$/i, ''),
-      category,
-      modelFile: req.file,
-      uploadedBy: req.user?.id,
-    });
+  const { name, category } = req.body;
+  const result = await adminService.createModel({
+    name: name || req.file.originalname.replace(/\.(glb|gltf)$/i, ''),
+    category,
+    modelFile: req.file,
+    uploadedBy: req.user?.id,
+  });
 
-    // Convert to proxy URLs in response
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    result.file_url = `${baseUrl}/api/admin/models/${result.id}/file`;
-    result.thumbnail = null;
+  const urls = getModelUrls(req, result.id);
+  result.file_url = urls.file;
+  result.thumbnail = null;
 
-    return res.status(201).json({ data: result });
-  } catch (err) {
-    console.error('uploadModel error', err);
-    return res.status(500).json({ message: 'Upload failed', error: err.message });
+  return res.status(201).json({ data: result });
+});
+
+const uploadModelThumbnail = asyncHandler(async (req, res) => {
+  const modelId = requirePositiveInt(req.params.id, 'Invalid model id');
+  if (!req.file) return res.status(400).json({ message: 'Thumbnail image required' });
+
+  const parsedViewState = parseModelViewState(req.body?.viewState);
+  if (req.body?.viewState && !parsedViewState) {
+    console.warn('Invalid viewState JSON for model', modelId);
   }
-}
 
-async function uploadModelThumbnail(req, res) {
-  try {
-    const modelId = parseInt(req.params.id, 10);
-    if (!modelId) return res.status(400).json({ message: 'Invalid model id' });
-    if (!req.file) return res.status(400).json({ message: 'Thumbnail image required' });
+  await adminService.updateModelThumbnail(modelId, req.file.buffer, parsedViewState);
 
-    let parsedViewState = null;
-    if (req.body?.viewState) {
-      try {
-        const candidate = JSON.parse(req.body.viewState);
-        const cp = candidate?.cameraPosition;
-        const ct = candidate?.controlsTarget;
-        const fov = candidate?.fov;
-        const isNumber = (n) => typeof n === 'number' && Number.isFinite(n);
-
-        if (
-          isNumber(cp?.x) && isNumber(cp?.y) && isNumber(cp?.z) &&
-          isNumber(ct?.x) && isNumber(ct?.y) && isNumber(ct?.z) &&
-          (fov === undefined || isNumber(fov))
-        ) {
-          parsedViewState = {
-            cameraPosition: { x: cp.x, y: cp.y, z: cp.z },
-            controlsTarget: { x: ct.x, y: ct.y, z: ct.z },
-            ...(fov !== undefined ? { fov } : {}),
-          };
-        }
-      } catch (e) {
-        console.warn('Invalid viewState JSON for model', modelId);
-      }
-    }
-
-    await adminService.updateModelThumbnail(modelId, req.file.buffer, parsedViewState);
-
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const thumbnailUrl = `${baseUrl}/api/admin/models/${modelId}/thumbnail`;
-    return res.json({ data: { thumbnail: thumbnailUrl, view_state: parsedViewState } });
-  } catch (err) {
-    console.error('uploadModelThumbnail error', err);
-    return res.status(500).json({ message: 'Server error', error: err.message });
-  }
-}
+  const thumbnailUrl = getModelUrls(req, modelId).thumbnail;
+  return res.json({ data: { thumbnail: thumbnailUrl, view_state: parsedViewState } });
+});
 
 async function removeModel(req, res) {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ message: 'Invalid model id' });
+    const id = requirePositiveInt(req.params.id, 'Invalid model id');
     await adminService.deleteModel(id);
     return res.status(204).send();
   } catch (err) {
     console.error('removeModel error', err);
-    return res.status(500).json({ message: 'Server error', error: err.message });
+    return sendControllerError(res, err);
   }
 }
 
@@ -282,42 +232,37 @@ async function createMapping(req, res) {
 
 async function getMappings(req, res) {
   try {
-    const bookId = req.query.book_id ? parseInt(req.query.book_id, 10) : null;
-    const page = req.query.page ? parseInt(req.query.page, 10) : null;
-    if (!bookId || !page) return res.status(400).json({ message: 'book_id and page required' });
+    const bookId = requirePositiveInt(req.query.book_id, 'book_id and page required');
+    const page = requirePositiveInt(req.query.page, 'book_id and page required');
     const mappings = await adminService.getMappings(bookId, page);
     res.json({ data: mappings });
   } catch (err) {
     console.error('getMappings error', err);
-    res.status(500).json({ message: 'Server error' });
+    sendControllerError(res, err);
   }
 }
 
 async function deleteMapping(req, res) {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ message: 'Invalid id' });
+    const id = requirePositiveInt(req.params.id, 'Invalid id');
     await adminService.deleteMapping(id);
     res.status(204).send();
   } catch (err) {
     console.error('deleteMapping error', err);
-    res.status(500).json({ message: 'Server error' });
+    sendControllerError(res, err);
   }
 }
 
 async function detectImages(req, res) {
   try {
-    const bookId = parseInt(req.params.id, 10);
-    const page = parseInt(req.query.page, 10);
-    if (!bookId || !page) {
-      return res.status(400).json({ message: 'book id and page query param required' });
-    }
+    const bookId = requirePositiveInt(req.params.id, 'book id and page query param required');
+    const page = requirePositiveInt(req.query.page, 'book id and page query param required');
 
     const detections = await adminService.detectImagesOnPage(bookId, page);
     return res.json({ data: detections });
   } catch (err) {
     console.error('detectImages error', err);
-    return res.status(500).json({ message: 'Detection failed', error: err.message });
+    return sendControllerError(res, err, 'Detection failed');
   }
 }
 

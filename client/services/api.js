@@ -38,6 +38,22 @@ function getApiBaseUrl() {
 
 const DEFAULT_BASE = getApiBaseUrl();
 
+function compactParams(params) {
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== null && value !== undefined && value !== ''),
+  );
+}
+
+async function withAuthRetry(requestFn) {
+  try {
+    return await requestFn();
+  } catch (err) {
+    if (err?.response?.status !== 401) throw err;
+    await refreshToken();
+    return requestFn();
+  }
+}
+
 export const api = axios.create({
   baseURL: DEFAULT_BASE,
   headers: { 'Content-Type': 'application/json' },
@@ -106,17 +122,13 @@ export async function fetchProfile() {
 // ==================== LIBRARY (public) ====================
 
 export async function fetchBooks({ search, category, page = 1, limit = 10, sort = 'newest' } = {}) {
-  const params = { page, limit, sort };
-  if (search) params.search = search;
-  if (category) params.category = category;
+  const params = compactParams({ page, limit, sort, search, category });
   const res = await api.get('/library/books', { params });
   return res.data; // { data: [...], pagination: {...} }
 }
 
 export async function fetchModels({ search, category, page = 1, limit = 10 } = {}) {
-  const params = { page, limit };
-  if (search) params.search = search;
-  if (category) params.category = category;
+  const params = compactParams({ page, limit, search, category });
   const res = await api.get('/library/models', { params });
   return res.data;
 }
@@ -127,24 +139,17 @@ export async function fetchAllModels() {
 }
 
 export async function fetchMappings(bookId, page) {
-  let res;
-  try {
-    res = await api.get('/library/mappings', { params: { book_id: bookId, page } });
-  } catch (err) {
-    if (err?.response?.status !== 401) throw err;
-    await refreshToken();
-    res = await api.get('/library/mappings', { params: { book_id: bookId, page } });
-  }
+  const res = await withAuthRetry(() => api.get('/library/mappings', { params: { book_id: bookId, page } }));
   return res.data.data || res.data;
 }
 
 export async function fetchBookMappings(bookId) {
-  let res;
-  try {
+  const res = await withAuthRetry(async () => {
     console.log('[API] fetchBookMappings - bookId:', bookId);
-    res = await api.get(`/library/books/${bookId}/mappings`);
-    console.log('[API] fetchBookMappings - success:', res.data);
-  } catch (err) {
+    const response = await api.get(`/library/books/${bookId}/mappings`);
+    console.log('[API] fetchBookMappings - success:', response.data);
+    return response;
+  }).catch((err) => {
     console.error('[API] fetchBookMappings - error:', {
       url: err?.config?.url,
       method: err?.config?.method,
@@ -153,27 +158,15 @@ export async function fetchBookMappings(bookId) {
       responseData: err?.response?.data,
       message: err?.message,
     });
-    
-    if (err?.response?.status !== 401) throw err;
-    
-    console.log('[API] Got 401, refreshing token...');
-    await refreshToken();
-    res = await api.get(`/library/books/${bookId}/mappings`);
-  }
+    throw err;
+  });
   return res.data.data || res.data;
 }
 
 // ==================== HOME (auth required) ====================
 
 export async function fetchHome() {
-  let res;
-  try {
-    res = await api.get('/home');
-  } catch (err) {
-    if (err?.response?.status !== 401) throw err;
-    await refreshToken();
-    res = await api.get('/home');
-  }
+  const res = await withAuthRetry(() => api.get('/home'));
   return res.data; // { recentlyRead: [...], trending: [...] }
 }
 

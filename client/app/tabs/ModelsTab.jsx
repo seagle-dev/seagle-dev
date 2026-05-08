@@ -6,9 +6,7 @@ import {
   FlatList,
   Image,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
-  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchModels, getToken } from '../../services/api';
@@ -16,14 +14,13 @@ import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../const
 import usePaginatedList from '../hooks/usePaginatedList';
 import LoadingView from '../components/LoadingView';
 import EmptyState from '../components/EmptyState';
-import Badge from '../components/Badge';
+import PaginatedListFooter from '../components/PaginatedListFooter';
 import ModelModal from '../components/Reading/ModelModal';
-
-const { width } = Dimensions.get('window');
+import { PLACEHOLDER_MODEL_THUMBNAIL } from '../../constants/placeholders';
 
 const getThumbnailUrl = (m) => {
   if (m.thumbnail) return m.thumbnail.startsWith('http') ? m.thumbnail : m.thumbnail;
-  return 'https://via.placeholder.com/400x400?text=3D+Model';
+  return PLACEHOLDER_MODEL_THUMBNAIL;
 };
 
 const mapModel = (m) => ({
@@ -87,12 +84,9 @@ export default function ModelsTab({ search = '', category = null }) {
     </TouchableOpacity>
   ), [handleModelPress]);
 
-  const renderFooter = () =>
-    loadingMore ? (
-      <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color={COLORS.navy} />
-      </View>
-    ) : null;
+  const renderFooter = useCallback(() => (
+    <PaginatedListFooter loading={loadingMore} />
+  ), [loadingMore]);
 
   if (loading) return <LoadingView message="Loading 3D models..." backgroundColor={COLORS.bgPrimary} />;
 
@@ -167,9 +161,5 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: COLORS.textSecondary,
     fontFamily: FONTS.regular,
-  },
-  footerLoader: {
-    paddingVertical: SPACING.xl,
-    alignItems: 'center',
   },
 });

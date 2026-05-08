@@ -2,6 +2,7 @@ const db = require('../config/db');
 const { uploadBuffer, uploadFile, deleteFileByPath, getFileBuffer } = require('./storage.service');
 const { generateCoverFromPdf } = require('./pdfCover.service');
 const { detectImagesOnPage: detectImagesFromPdf } = require('./pdfDetection.service');
+const { normalizeViewState } = require('../utils/viewState');
 
 // ==================== BOOKS ====================
 
@@ -132,19 +133,6 @@ async function listModels() {
   const sql = `SELECT id, name, file_url, thumbnail, view_state, category, created_at FROM models_3d WHERE file_url IS NOT NULL ORDER BY created_at DESC`;
   try {
     const [rows] = await db.execute(sql);
-
-    const normalizeViewState = (raw) => {
-      if (!raw) return null;
-      if (typeof raw === 'object') return raw;
-      if (typeof raw === 'string') {
-        try {
-          return JSON.parse(raw);
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    };
 
     return rows.map(model => ({
       id: model.id,

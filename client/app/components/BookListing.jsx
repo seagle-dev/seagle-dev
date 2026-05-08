@@ -6,15 +6,13 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
-  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme';
 import LoadingView from './LoadingView';
 import { fetchHome, getBookCoverUrl } from '../../services/api';
 import { Ionicons } from '@expo/vector-icons';
-
-const PLACEHOLDER_COVER = 'https://via.placeholder.com/200x300?text=No+Cover';
+import { PLACEHOLDER_BOOK_COVER } from '../../constants/placeholders';
 
 const mapRecentBook = (b) => ({
   id: String(b.id),
@@ -22,7 +20,7 @@ const mapRecentBook = (b) => ({
   author: '',
   progress: 50,
   chapter: '',
-  image: b.coverImage ? getBookCoverUrl(b.id) : PLACEHOLDER_COVER,
+  image: b.coverImage ? getBookCoverUrl(b.id) : PLACEHOLDER_BOOK_COVER,
   coverColor: '#4A90E2',
   pdfUrl: b.pdfUrl,
 });
@@ -33,7 +31,7 @@ const mapTrendingBook = (b) => ({
   author: '',
   price: 0,
   originalPrice: null,
-  image: b.coverImage ? getBookCoverUrl(b.id) : PLACEHOLDER_COVER,
+  image: b.coverImage ? getBookCoverUrl(b.id) : PLACEHOLDER_BOOK_COVER,
   rating: 4.5,
   reviews: b.readCount || 0,
   pdfUrl: b.pdfUrl,

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { fetchProfile } from '../../services/api';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
 import CacheDebugPanel from '../components/CacheDebugPanel';
+import { PLACEHOLDER_PROFILE_IMAGE } from '../../constants/placeholders';
 
 export default function ProfileScreen() {
   const { user: authUser, signOut } = useAuth();
@@ -44,7 +45,7 @@ export default function ProfileScreen() {
       <View style={styles.headerCard}>
         <View style={styles.profileImageContainer}>
           <Image
-            source={{ uri: user.profileImage || 'https://via.placeholder.com/100' }}
+            source={{ uri: user.profileImage || PLACEHOLDER_PROFILE_IMAGE }}
             style={styles.profileImage}
           />
           <TouchableOpacity style={styles.editImageBadge}>

@@ -30,43 +30,43 @@ import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../../constants/t
 import { getModelFileUrl } from '../../../services/api';
 import getModelViewerHtml from './modelViewerHtml';
 
-const ModelModal = memo(function ModelModal({
-  visible,
-  model,
-  authToken,
-  onModelContextReady,
-  onClose,
-  presentation = 'full',
-}) {
-  const [selectedPart, setSelectedPart] = useState(null);
+const webViewProps = {
+  allowFileAccess: true,
+  allowFileAccessFromFileURLs: true,
+  allowUniversalAccessFromFileURLs: true,
+  originWhitelist: ['*', 'file://'],
+  javaScriptEnabled: true,
+  domStorageEnabled: true,
+  mixedContentMode: 'always',
+  scrollEnabled: false,
+  bounces: false,
+};
+
+function ModelViewerFrame({ html, iframeRef, onMessage }) {
+  if (Platform.OS === 'web') {
+    return (
+      <iframe
+        ref={iframeRef}
+        srcDoc={html}
+        style={{ width: '100%', height: '100%', border: 'none' }}
+        title="3D Model Viewer"
+      />
+    );
+  }
+
+  return (
+    <WebView
+      source={{ html }}
+      style={styles.webView}
+      onMessage={onMessage}
+      {...webViewProps}
+    />
+  );
+}
+
+function useModelBase64({ model, onModelContextReady }) {
   const [modelBase64, setModelBase64] = useState(null);
-  const iframeRef = useRef(null);
-  const isReaderPresentation = presentation === 'reader';
 
-  const modelUrl = model?.localFileUri || (model?.id ? getModelFileUrl(model.id) : null);
-
-  useEffect(() => {
-    if (visible) {
-      console.log('[ModelModal] visible:', visible);
-      console.log('[ModelModal] model:', model);
-      console.log('[ModelModal] modelUrl:', modelUrl);
-      console.log('[ModelModal] localFileUri exists?', !!model?.localFileUri);
-      console.log('[ModelModal] model id:', model?.id);
-      console.log('[ModelModal] viewState:', viewState);
-    }
-  }, [visible, model, modelUrl, viewState]);
-
-  // Debug: confirm the viewer receives the saved orientation payload.
-  const viewState = model?.view_state ?? model?.viewState ?? null;
-  
-  // Safe logging for debugging
-  useEffect(() => {
-    if (visible && model) {
-      console.log(`[ModelModal] Opening model on ${Platform.OS}:`, model.id, model.name);
-    }
-  }, [visible, model]);
-
-  // Read GLB file as base64 to bypass WebView filesystem sandbox on iOS
   useEffect(() => {
     setModelBase64(null);
     if (!model?.localFileUri) return;
@@ -99,6 +99,45 @@ const ModelModal = memo(function ModelModal({
 
     readModelAsBase64();
   }, [model?.localFileUri, model?.id, model?.name, model?.thumbnail, model?.view_state, onModelContextReady]);
+
+  return modelBase64;
+}
+
+const ModelModal = memo(function ModelModal({
+  visible,
+  model,
+  authToken,
+  onModelContextReady,
+  onClose,
+  presentation = 'full',
+}) {
+  const [selectedPart, setSelectedPart] = useState(null);
+  const iframeRef = useRef(null);
+  const isReaderPresentation = presentation === 'reader';
+
+  const modelUrl = model?.localFileUri || (model?.id ? getModelFileUrl(model.id) : null);
+  const modelBase64 = useModelBase64({ model, onModelContextReady });
+
+  // Debug: confirm the viewer receives the saved orientation payload.
+  const viewState = model?.view_state ?? model?.viewState ?? null;
+
+  useEffect(() => {
+    if (visible) {
+      console.log('[ModelModal] visible:', visible);
+      console.log('[ModelModal] model:', model);
+      console.log('[ModelModal] modelUrl:', modelUrl);
+      console.log('[ModelModal] localFileUri exists?', !!model?.localFileUri);
+      console.log('[ModelModal] model id:', model?.id);
+      console.log('[ModelModal] viewState:', viewState);
+    }
+  }, [visible, model, modelUrl, viewState]);
+
+  // Safe logging for debugging
+  useEffect(() => {
+    if (visible && model) {
+      console.log(`[ModelModal] Opening model on ${Platform.OS}:`, model.id, model.name);
+    }
+  }, [visible, model]);
 
   const html = useMemo(() => {
     if (!modelUrl) return null;
@@ -158,32 +197,7 @@ const ModelModal = memo(function ModelModal({
 
             {html ? (
               <View style={styles.readerScene}>
-                {Platform.OS === 'web' ? (
-                  <iframe
-                    ref={iframeRef}
-                    srcDoc={html}
-                    style={{ width: '100%', height: '100%', border: 'none' }}
-                    title="3D Model Viewer"
-                  />
-                ) : (
-                <WebView
-                  source={{ html }}
-                  style={styles.webView}
-                  allowFileAccess={true}
-                  allowFileAccessFromFileURLs={true}
-                  allowUniversalAccessFromFileURLs={true}
-                  originWhitelist={['*', 'file://']}
-                  javaScriptEnabled
-                  domStorageEnabled
-                  allowFileAccess
-                  allowFileAccessFromFileURLs
-                  allowUniversalAccessFromFileURLs
-                  mixedContentMode="always"
-                  onMessage={handleMessage}
-                  scrollEnabled={false}
-                    bounces={false}
-                  />
-                )}
+                <ModelViewerFrame html={html} iframeRef={iframeRef} onMessage={handleMessage} />
               </View>
             ) : (
               <View style={[styles.readerScene, styles.emptyState]}>
@@ -231,32 +245,7 @@ const ModelModal = memo(function ModelModal({
         {/* 3D WebView / Iframe */}
         <View style={styles.sceneContainer}>
           {html ? (
-            Platform.OS === 'web' ? (
-              <iframe
-                ref={iframeRef}
-                srcDoc={html}
-                style={{ width: '100%', height: '100%', border: 'none' }}
-                title="3D Model Viewer"
-              />
-            ) : (
-              <WebView
-                source={{ html }}
-                style={styles.webView}
-                allowFileAccess={true}
-                allowFileAccessFromFileURLs={true}
-                allowUniversalAccessFromFileURLs={true}
-                originWhitelist={['*', 'file://']}
-                javaScriptEnabled
-                domStorageEnabled
-                allowFileAccess
-                allowFileAccessFromFileURLs
-                allowUniversalAccessFromFileURLs
-                mixedContentMode="always"
-                onMessage={handleMessage}
-                scrollEnabled={false}
-                bounces={false}
-              />
-            )
+            <ModelViewerFrame html={html} iframeRef={iframeRef} onMessage={handleMessage} />
           ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>No model available</Text>
@@ -267,7 +256,7 @@ const ModelModal = memo(function ModelModal({
         {/* Touch hint */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            {Platform.OS === 'web' 
+            {Platform.OS === 'web'
               ? 'Drag to rotate · Scroll to zoom · Right-click drag to pan'
               : 'Drag to rotate · Pinch to zoom · Two-finger drag to pan'}
           </Text>

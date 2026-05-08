@@ -111,8 +111,9 @@ app.use((req, res) => {
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
-  res.status(500).json({
-    message: 'Internal server error',
+  const statusCode = err.statusCode || err.status || 500;
+  res.status(statusCode).json({
+    message: statusCode === 500 ? 'Internal server error' : err.message,
     error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });

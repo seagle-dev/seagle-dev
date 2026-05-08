@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
+import { PLACEHOLDER_AVATAR } from '../../constants/placeholders';
 
 const TopHeader = ({
   showBackButton = false,
@@ -99,7 +100,7 @@ const TopHeader = ({
 
               {showProfile && (
                 <TouchableOpacity onPress={() => setShowProfileMenu(true)} activeOpacity={0.7}>
-                  <Image source={{ uri: 'https://via.placeholder.com/40' }} style={styles.profileImage} />
+                  <Image source={{ uri: PLACEHOLDER_AVATAR }} style={styles.profileImage} />
                 </TouchableOpacity>
               )}
             </>

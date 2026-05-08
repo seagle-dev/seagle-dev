@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
 import EmptyState from '../components/EmptyState';
+import { PLACEHOLDER_CART_IMAGE } from '../../constants/placeholders';
 
 const MOCK_CART_ITEMS = [
   {
@@ -11,14 +12,14 @@ const MOCK_CART_ITEMS = [
     title: 'Anatomy and Physiology 2e',
     author: 'J. Gordon Betts',
     price: 1250,
-    image: 'https://via.placeholder.com/150',
+    image: PLACEHOLDER_CART_IMAGE,
   },
   {
     id: '2',
     title: 'Microbiology',
     author: 'Nina Parker',
     price: 950,
-    image: 'https://via.placeholder.com/150',
+    image: PLACEHOLDER_CART_IMAGE,
   },
 ];
 
