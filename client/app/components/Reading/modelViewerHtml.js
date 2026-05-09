@@ -29,15 +29,15 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <style>
     * { margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #303030; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #f8f9fa; }
     canvas { display: block; width: 100%; height: 100%; touch-action: none; }
     #loading {
       position: absolute; inset: 0;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      background: #303030;
+      background: #f8f9fa;
       font-family: -apple-system, sans-serif;
-      color: rgba(255,255,255,0.78); font-size: 14px;
+      color: rgba(17, 26, 80, 0.7); font-size: 14px;
     }
     #debugInfo {
       position: absolute; bottom: 10px; left: 10px;
@@ -152,7 +152,7 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
     // ---- Scene Setup ----
     console.log('[modelViewerHtml] Setting up scene...');
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x303030);
+    scene.background = new THREE.Color(0xf8f9fa);
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 100);
     camera.position.set(0, 0, 4);

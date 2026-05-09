@@ -2,7 +2,9 @@ const db = require("../config/db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const admin = require('../config/firebase');
+const { Resend } = require('resend');
 
+const resend = new Resend(process.env.RESEND_API_KEY);
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 
 exports.register = async (req, res) => {
@@ -193,7 +195,7 @@ exports.refreshToken = (req, res) => {
 exports.profile = async (req, res) => {
   try {
     const [rows] = await db.execute(
-      'SELECT id, email, role FROM users WHERE id = ? LIMIT 1',
+      'SELECT id, email, role, first_name, last_name, username, department, course, year_level, classes_enrolled, classes_completed FROM users WHERE id = ? LIMIT 1',
       [req.user.id],
     );
 
@@ -203,14 +205,160 @@ exports.profile = async (req, res) => {
 
     const user = rows[0];
     return res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-      },
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      username: user.username,
+      department: user.department,
+      course: user.course,
+      yearLevel: user.year_level,
+      classesEnrolled: user.classes_enrolled,
+      classesCompleted: user.classes_completed,
     });
   } catch (err) {
     console.error('auth.profile error', err);
     return res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+exports.updateProfile = async (req, res) => {
+  const { firstName, lastName, username } = req.body;
+  
+  try {
+    await db.execute(
+      "UPDATE users SET first_name = ?, last_name = ?, username = ? WHERE id = ?",
+      [firstName || '', lastName || '', username || '', req.user.id]
+    );
+
+    res.json({ message: "Profile updated successfully" });
+  } catch (err) {
+    console.error('updateProfile error', err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+exports.changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ message: "Both current and new password are required" });
+  }
+
+  try {
+    const [rows] = await db.execute("SELECT * FROM users WHERE id = ?", [req.user.id]);
+    if (!rows || rows.length === 0) return res.status(404).json({ message: "User not found" });
+
+    const user = rows[0];
+    if (!user.password_hash) {
+      return res.status(400).json({ message: "Account uses external authentication and cannot change password here." });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Incorrect current password" });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await db.execute("UPDATE users SET password_hash = ? WHERE id = ?", [newHash, req.user.id]);
+
+    res.json({ message: "Password updated successfully" });
+  } catch (err) {
+    console.error('changePassword error', err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  try {
+    const [rows] = await db.execute("SELECT * FROM users WHERE email = ?", [email]);
+    if (rows && rows.length > 0) {
+      const user = rows[0];
+      if (user.password_hash) {
+        // Local DB user: Generate a 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+        // Delete any existing OTPs for this email to prevent spam
+        await db.execute("DELETE FROM password_resets WHERE email = ?", [email]);
+
+        // Save new OTP
+        await db.execute(
+          "INSERT INTO password_resets (email, otp, expires_at) VALUES (?, ?, ?)",
+          [email, otp, expiresAt]
+        );
+
+        console.log(`[DEBUG] OTP for ${email} is ${otp}`);
+
+        // Try to send email with Resend
+        if (process.env.RESEND_API_KEY) {
+          try {
+            await resend.emails.send({
+              from: 'Seagle App <onboarding@resend.dev>', // Use verified domain in prod
+              to: [email],
+              subject: 'Your Password Reset Code',
+              html: `<p>Your password reset code is: <strong>${otp}</strong></p><p>This code will expire in 15 minutes.</p>`,
+            });
+            console.log('OTP email sent to', email);
+          } catch (emailErr) {
+            console.error('Failed to send OTP email:', emailErr);
+          }
+        } else {
+          console.warn('No RESEND_API_KEY set. Check server logs for the OTP.');
+        }
+      }
+    }
+    
+    // Always return success to prevent email enumeration
+    res.json({ message: "If an account exists, a reset code has been sent." });
+  } catch (err) {
+    console.error('forgotPassword error', err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+
+  if (!email || !otp || !newPassword) {
+    return res.status(400).json({ message: "Email, OTP, and new password are required" });
+  }
+
+  try {
+    // Find the OTP record
+    const [resetRows] = await db.execute(
+      "SELECT * FROM password_resets WHERE email = ? AND otp = ? AND expires_at > NOW()",
+      [email, otp]
+    );
+
+    if (!resetRows || resetRows.length === 0) {
+      return res.status(400).json({ message: "Invalid or expired reset code" });
+    }
+
+    // Verify the user exists
+    const [userRows] = await db.execute("SELECT id FROM users WHERE email = ?", [email]);
+    if (!userRows || userRows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const userId = userRows[0].id;
+
+    // Hash the new password and update the user
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await db.execute("UPDATE users SET password_hash = ? WHERE id = ?", [newHash, userId]);
+
+    // Delete the used OTP
+    await db.execute("DELETE FROM password_resets WHERE email = ?", [email]);
+
+    res.json({ message: "Password has been successfully reset" });
+  } catch (err) {
+    console.error('resetPassword error', err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 };

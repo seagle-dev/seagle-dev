@@ -96,7 +96,7 @@ export default function Auth() {
             <Text style={styles.checkboxLabel}>Stay signed in</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('../screens/ForgotPasswordScreen')}>
             <Text style={styles.forgot}>Forgot your password?</Text>
           </TouchableOpacity>
         </View>
@@ -154,8 +154,8 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   logo: {
-    width: 92,
-    height: 92,
+    width: 140,
+    height: 140,
     alignSelf: 'center',
     marginTop: SPACING.sm,
     marginBottom: SPACING.lg,

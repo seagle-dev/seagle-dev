@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { fetchProfile } from '../../services/api';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
 import CacheDebugPanel from '../components/CacheDebugPanel';
 import { PLACEHOLDER_PROFILE_IMAGE } from '../../constants/placeholders';
+import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
   const { user: authUser, signOut } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('Profile'); // 'Profile' or 'Settings'
+  const router = useRouter();
 
   useEffect(() => {
     (async () => {
@@ -19,7 +22,6 @@ export default function ProfileScreen() {
         setProfile(data);
       } catch (err) {
         console.warn('Failed to fetch profile:', err.message);
-        // Fallback to auth user if API fails or isn't implemented yet
         setProfile(authUser);
       } finally {
         setLoading(false);
@@ -36,72 +38,196 @@ export default function ProfileScreen() {
   }
 
   const user = profile || authUser;
-
   if (!user) return null;
 
-  return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Profile Header */}
-      <View style={styles.headerCard}>
-        <View style={styles.profileImageContainer}>
-          <Image
-            source={{ uri: user.profileImage || PLACEHOLDER_PROFILE_IMAGE }}
-            style={styles.profileImage}
-          />
-          <TouchableOpacity style={styles.editImageBadge}>
-            <Ionicons name="camera" size={20} color={COLORS.white} />
-          </TouchableOpacity>
+  const renderProfileTab = () => (
+    <View style={styles.tabContent}>
+      {/* Stats Row */}
+      <View style={styles.statsRow}>
+        <View style={[styles.statCard, { backgroundColor: COLORS.navy }]}>
+          <View style={styles.statIconContainer}>
+            <Feather name="book-open" size={20} color={COLORS.white} />
+          </View>
+          <View>
+            <Text style={styles.statValue}>3</Text>
+            <Text style={styles.statLabel}>Classes Enrolled</Text>
+          </View>
         </View>
-        <Text style={styles.userName}>{user.firstName} {user.lastName}</Text>
-        <Text style={styles.userEmail}>{user.email}</Text>
-        <View style={styles.badgeRow}>
-          <View style={styles.roleBadge}>
-            <Text style={styles.roleBadgeText}>{user.role || 'Student'}</Text>
+        <View style={[styles.statCard, { backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border }]}>
+          <View style={[styles.statIconContainer, { backgroundColor: COLORS.navy }]}>
+            <Feather name="check-circle" size={20} color={COLORS.white} />
+          </View>
+          <View>
+            <Text style={[styles.statValue, { color: COLORS.navy }]}>3</Text>
+            <Text style={[styles.statLabel, { color: COLORS.textSecondary }]}>Classes Completed</Text>
           </View>
         </View>
       </View>
-      {/* ... rest of the component */}
 
-      {/* Account Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account Settings</Text>
-        <ProfileItem icon="person-outline" label="Edit Profile" />
-        <ProfileItem icon="notifications-outline" label="Notifications" />
-        <ProfileItem icon="shield-checkmark-outline" label="Security" />
+      {/* Personal Section */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Personal</Text>
+        <Text style={styles.sectionSubtitle}>Manage your account identity. Note: Your registered email is permanent and cannot be edited.</Text>
       </View>
 
-      {/* Preferences Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Preferences</Text>
-        <ProfileItem icon="color-palette-outline" label="Appearance" />
-        <ProfileItem icon="language-outline" label="Language" />
-        <ProfileItem icon="help-circle-outline" label="Help & Support" />
+      <View style={styles.infoGrid}>
+        <InfoItem label="First Name" value={user.firstName} />
+        <InfoItem label="Last Name" value={user.lastName} />
+        <InfoItem label="Username" value={user.username || user.email?.split('@')[0]} />
+        <InfoItem label="Email Address" value={user.email} isLocked={true} />
       </View>
 
-      {/* Cache Debug Panel */}
-      <View style={{ marginHorizontal: SPACING.lg, marginBottom: SPACING.md }}>
-        <CacheDebugPanel />
+      {/* Academic Section */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Academic Information</Text>
+        <Text style={styles.sectionSubtitle}>Your official school records. These fields are read-only.</Text>
       </View>
 
-      {/* Logout */}
+      <View style={styles.infoGrid}>
+        <InfoItem label="Department" value={user.department || 'Medicine'} isLocked={true} />
+        <InfoItem label="Course" value={user.course || 'Anatomy'} isLocked={true} />
+        <InfoItem label="Year Level" value={user.yearLevel || '1st Year'} isLocked={true} />
+      </View>
+
+      <TouchableOpacity 
+        style={styles.editProfileButton}
+        onPress={() => router.push('/screens/settings/EditProfileScreen')}
+      >
+        <Text style={styles.editProfileButtonText}>Edit Profile</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderSettingsTab = () => (
+    <View style={styles.tabContent}>
+      <Text style={styles.groupTitle}>Notifications</Text>
+      <View style={styles.settingsGroup}>
+        <SettingItem 
+          icon="mail-outline" 
+          title="Email Alerts" 
+          subtitle="Toggle for new course materials or grade updates." 
+          onPress={() => router.push('/screens/settings/NotificationsScreen')}
+        />
+        <SettingItem 
+          icon="notifications-outline" 
+          title="Activity Reminders" 
+          subtitle="Alerts for upcoming class deadlines or events." 
+          onPress={() => router.push('/screens/settings/NotificationsScreen')}
+        />
+        <SettingItem 
+          icon="megaphone-outline" 
+          title="System Announcements" 
+          subtitle="Toggle for maintenance or platform updates." 
+          onPress={() => router.push('/screens/settings/NotificationsScreen')}
+        />
+      </View>
+
+      <Text style={styles.groupTitle}>Security</Text>
+      <View style={styles.settingsGroup}>
+        <SettingItem 
+          icon="lock-closed-outline" 
+          title="Password" 
+          subtitle="Manage your password." 
+          onPress={() => router.push('/screens/settings/SecurityScreen')}
+        />
+        <SettingItem 
+          icon="shield-checkmark-outline" 
+          title="Two-Factor Authentication" 
+          subtitle="Enable extra security." 
+          onPress={() => router.push('/screens/settings/SecurityScreen')}
+        />
+      </View>
+
+      <Text style={styles.groupTitle}>Display Preferences</Text>
+      <View style={styles.settingsGroup}>
+        <SettingItem 
+          icon="language-outline" 
+          title="Language" 
+          subtitle="Select the interface language." 
+          onPress={() => router.push('/screens/settings/LanguageScreen')}
+        />
+        <SettingItem 
+          icon="time-outline" 
+          title="Time Zone" 
+          subtitle="Select your local time zone here." 
+          onPress={() => router.push('/screens/settings/AppearanceScreen')}
+        />
+      </View>
+
       <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
-        <Ionicons name="log-out-outline" size={22} color={COLORS.red} />
+        <Ionicons name="log-out-outline" size={20} color={COLORS.red} />
         <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>
+    </View>
+  );
 
-      <View style={styles.bottomSpacing} />
-    </ScrollView>
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Profile Header */}
+        <View style={styles.header}>
+          <View style={styles.profileImageContainer}>
+            <Image
+              source={{ uri: user.profileImage || PLACEHOLDER_PROFILE_IMAGE }}
+              style={styles.profileImage}
+            />
+            <TouchableOpacity style={styles.cameraButton}>
+              <Ionicons name="camera" size={18} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.nameText}>{user.firstName} {user.lastName}</Text>
+          <Text style={styles.roleText}>{user.role?.toUpperCase() || 'STUDENT'}</Text>
+
+          {/* Tab Bar */}
+          <View style={styles.tabBar}>
+            <TouchableOpacity 
+              style={[styles.tabItem, activeTab === 'Profile' && styles.activeTabItem]}
+              onPress={() => setActiveTab('Profile')}
+            >
+              <Text style={[styles.tabText, activeTab === 'Profile' && styles.activeTabText]}>Profile</Text>
+              {activeTab === 'Profile' && <View style={styles.activeTabIndicator} />}
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.tabItem, activeTab === 'Settings' && styles.activeTabItem]}
+              onPress={() => setActiveTab('Settings')}
+            >
+              <Text style={[styles.tabText, activeTab === 'Settings' && styles.activeTabText]}>Settings</Text>
+              {activeTab === 'Settings' && <View style={styles.activeTabIndicator} />}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {activeTab === 'Profile' ? renderProfileTab() : renderSettingsTab()}
+
+        <View style={styles.devSection}>
+          <CacheDebugPanel />
+        </View>
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-function ProfileItem({ icon, label, onPress }) {
+function InfoItem({ label, value, isLocked }) {
   return (
-    <TouchableOpacity style={styles.item} onPress={onPress}>
-      <View style={styles.itemLeft}>
-        <View style={styles.iconBg}>
-          <Ionicons name={icon} size={20} color={COLORS.navy} />
-        </View>
-        <Text style={styles.itemLabel}>{label}</Text>
+    <View style={styles.infoItem}>
+      <Text style={styles.infoLabel}>{label} {isLocked && <Ionicons name="lock-closed" size={10} color={COLORS.textTertiary} />}</Text>
+      <View style={[styles.infoValueContainer, isLocked && styles.lockedValueContainer]}>
+        <Text style={styles.infoValue}>{value || '---'}</Text>
+      </View>
+    </View>
+  );
+}
+
+function SettingItem({ icon, title, subtitle, onPress }) {
+  return (
+    <TouchableOpacity style={styles.settingItem} onPress={onPress}>
+      <View style={styles.settingIconContainer}>
+        <Ionicons name={icon} size={22} color={COLORS.navy} />
+      </View>
+      <View style={styles.settingTextContainer}>
+        <Text style={styles.settingTitle}>{title}</Text>
+        <Text style={styles.settingSubtitle}>{subtitle}</Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color={COLORS.textTertiary} />
     </TouchableOpacity>
@@ -109,126 +235,233 @@ function ProfileItem({ icon, label, onPress }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bgPrimary },
+  container: { flex: 1, backgroundColor: COLORS.white },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  headerCard: {
-    backgroundColor: COLORS.white,
-    padding: SPACING.xxl,
+  header: {
     alignItems: 'center',
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    ...SHADOWS.small,
-    marginBottom: SPACING.lg,
+    paddingTop: SPACING.xl,
+    backgroundColor: COLORS.white,
   },
   profileImageContainer: {
-    position: 'relative',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 2,
+    borderColor: COLORS.navy,
+    padding: 4,
     marginBottom: SPACING.md,
+    position: 'relative',
   },
   profileImage: {
-    width: 100,
-    height: 100,
+    width: '100%',
+    height: '100%',
     borderRadius: 50,
-    borderWidth: 3,
-    borderColor: COLORS.bgPrimary,
   },
-  editImageBadge: {
+  cameraButton: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: COLORS.orange,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    backgroundColor: COLORS.navy,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: COLORS.white,
   },
-  userName: {
-    fontSize: FONT_SIZES.xxl,
+  nameText: {
+    fontSize: 22,
     fontWeight: '700',
     color: COLORS.navy,
     fontFamily: FONTS.serifBold,
-    marginBottom: 4,
   },
-  userEmail: {
-    fontSize: FONT_SIZES.md,
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.md,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  roleBadge: {
-    backgroundColor: COLORS.bgLight,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: COLORS.navy,
-  },
-  roleBadgeText: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.navy,
-    fontWeight: '700',
-  },
-  section: {
-    backgroundColor: COLORS.white,
-    marginHorizontal: SPACING.lg,
-    padding: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    marginBottom: SPACING.md,
-    ...SHADOWS.small,
-  },
-  sectionTitle: {
-    fontSize: FONT_SIZES.md,
+  roleText: {
+    fontSize: 14,
     fontWeight: '700',
     color: COLORS.navy,
-    marginBottom: SPACING.md,
-    marginLeft: 4,
+    letterSpacing: 1.5,
+    marginTop: 4,
+    marginBottom: SPACING.xl,
+    opacity: 0.8,
   },
-  item: {
+  tabBar: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: SPACING.xxl,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  tabItem: {
     paddingVertical: SPACING.md,
-    paddingHorizontal: 4,
+    marginRight: SPACING.xxl,
+    position: 'relative',
   },
-  itemLeft: {
+  tabText: {
+    fontSize: FONT_SIZES.lg,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  activeTabText: {
+    color: COLORS.navy,
+  },
+  activeTabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: COLORS.navy,
+    borderRadius: 3,
+  },
+  tabContent: {
+    padding: SPACING.lg,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    marginBottom: SPACING.xl,
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    ...SHADOWS.small,
   },
-  iconBg: {
+  statIconContainer: {
     width: 36,
     height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  statLabel: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '500',
+  },
+  sectionHeader: {
+    marginBottom: SPACING.md,
+    marginTop: SPACING.sm,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.navy,
+  },
+  sectionSubtitle: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  infoGrid: {
+    marginBottom: SPACING.lg,
+  },
+  infoItem: {
+    marginBottom: SPACING.md,
+  },
+  infoLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.navy,
+    marginBottom: 6,
+  },
+  infoValueContainer: {
+    backgroundColor: COLORS.bgPrimary,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  lockedValueContainer: {
+    backgroundColor: '#f1f1f1',
+    borderColor: '#e0e0e0',
+  },
+  infoValue: {
+    fontSize: 14,
+    color: COLORS.textPrimary,
+  },
+  editProfileButton: {
+    backgroundColor: COLORS.orange,
+    paddingVertical: SPACING.lg,
+    borderRadius: RADIUS.lg,
+    alignItems: 'center',
+    marginTop: SPACING.md,
+    ...SHADOWS.small,
+  },
+  editProfileButtonText: {
+    color: COLORS.navy,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  groupTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.navy,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  settingsGroup: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: 'hidden',
+    marginBottom: SPACING.lg,
+  },
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  settingIconContainer: {
+    width: 40,
+    height: 40,
     borderRadius: 10,
     backgroundColor: COLORS.bgPrimary,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
   },
-  itemLabel: {
-    fontSize: FONT_SIZES.body,
+  settingTextContainer: {
+    flex: 1,
+  },
+  settingTitle: {
+    fontSize: 14,
+    fontWeight: '600',
     color: COLORS.textPrimary,
-    fontWeight: '500',
+  },
+  settingSubtitle: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginTop: 2,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.white,
-    marginHorizontal: SPACING.lg,
     paddingVertical: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    gap: 10,
     marginTop: SPACING.sm,
-    ...SHADOWS.small,
+    gap: 8,
   },
   logoutText: {
     color: COLORS.red,
-    fontSize: FONT_SIZES.lg,
+    fontSize: 16,
     fontWeight: '700',
   },
-  bottomSpacing: { height: 40 },
+  devSection: {
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.xl,
+  },
 });

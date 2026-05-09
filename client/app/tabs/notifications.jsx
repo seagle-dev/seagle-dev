@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
 import EmptyState from '../components/EmptyState';
 
@@ -31,7 +32,13 @@ const MOCK_NOTIFICATIONS = [
   },
 ];
 
-export default function NotificationsScreen() {
+export default function NotificationsTab() {
+  const router = useRouter();
+
+  const handleGoToLibrary = () => {
+    router.replace('/tabs/library');
+  };
+
   const renderItem = ({ item }) => (
     <TouchableOpacity 
       style={[styles.notificationCard, !item.read && styles.unreadCard]}
@@ -60,6 +67,17 @@ export default function NotificationsScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          <TouchableOpacity 
+            style={styles.backToLibraryBtn} 
+            onPress={handleGoToLibrary}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="library-outline" size={18} color={COLORS.navy} />
+            <Text style={styles.backToLibraryText}>Explore Library</Text>
+            <Ionicons name="arrow-forward" size={14} color={COLORS.navy} />
+          </TouchableOpacity>
+        }
         ListEmptyComponent={
           <EmptyState 
             icon="notifications-off-outline" 
@@ -85,14 +103,33 @@ function getIconColor(type) {
   switch (type) {
     case 'new_book': return COLORS.orange;
     case 'reminder': return COLORS.navy;
-    case 'update': return '#4CAF50';
+    case 'update': return COLORS.green || '#4CAF50';
     default: return COLORS.textSecondary;
   }
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bgPrimary },
-  listContent: { padding: SPACING.lg },
+  listContent: { padding: SPACING.lg, paddingBottom: 40 },
+  
+  backToLibraryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.orange,
+    paddingVertical: 12,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.lg,
+    marginBottom: SPACING.xl,
+    gap: 10,
+    ...SHADOWS.small,
+  },
+  backToLibraryText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.navy,
+  },
+
   notificationCard: {
     flexDirection: 'row',
     backgroundColor: COLORS.white,
@@ -100,6 +137,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     marginBottom: SPACING.md,
     ...SHADOWS.small,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     alignItems: 'center',
   },
   unreadCard: {
@@ -138,16 +177,16 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   title: {
-    fontSize: FONT_SIZES.md,
+    fontSize: 15,
     fontWeight: '700',
     color: COLORS.navy,
   },
   time: {
-    fontSize: FONT_SIZES.xs,
+    fontSize: 11,
     color: COLORS.textTertiary,
   },
   message: {
-    fontSize: FONT_SIZES.sm,
+    fontSize: 13,
     color: COLORS.textSecondary,
     lineHeight: 18,
   },

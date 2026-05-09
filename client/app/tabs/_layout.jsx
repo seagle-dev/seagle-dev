@@ -8,10 +8,34 @@ export default function TabsLayout() {
   const pathname = usePathname();
   const isReadingMode = pathname.startsWith('/tabs/Reader');
 
+  const getHeaderProps = () => {
+    switch (pathname) {
+      case '/tabs/profile':
+        return { title: "Profile & Settings", showBackButton: true };
+      case '/tabs/library':
+        return { title: "", showNotifications: true, showCart: true };
+      case '/tabs/classroom':
+        return { title: "My Classroom", showNotifications: true };
+      case '/tabs/quizzes':
+        return { title: "Assessments", showNotifications: true };
+      case '/tabs/notifications':
+        return { title: "Notifications", showBackButton: true };
+      case '/tabs/cart':
+        return { title: "Your Cart", showBackButton: true };
+      default:
+        return { title: "" };
+    }
+  };
+
+  const headerProps = getHeaderProps();
+
   return (
     <View style={styles.container}>
       {!isReadingMode && (
-        <TopHeader showBackButton={false} title="" showNotifications={false} showCart={false} />
+        <TopHeader 
+          {...headerProps}
+          backgroundColor={COLORS.navy}
+        />
       )}
       <View style={styles.contentClip}>
         <Slot />

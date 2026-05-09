@@ -107,6 +107,16 @@ export async function register(email, password) {
   return { token, user };
 }
 
+export async function forgotPassword(email) {
+  const res = await api.post('/auth/forgot-password', { email });
+  return res.data;
+}
+
+export async function resetPassword(email, otp, newPassword) {
+  const res = await api.post('/auth/reset-password', { email, otp, newPassword });
+  return res.data;
+}
+
 export async function refreshToken() {
   const res = await api.post('/auth/refresh');
   const { token } = res.data;
@@ -116,6 +126,16 @@ export async function refreshToken() {
 
 export async function fetchProfile() {
   const res = await api.get('/auth/profile');
+  return res.data;
+}
+
+export async function updateProfile(data) {
+  const res = await withAuthRetry(() => api.put('/auth/profile', data));
+  return res.data;
+}
+
+export async function changePassword(currentPassword, newPassword) {
+  const res = await withAuthRetry(() => api.post('/auth/change-password', { currentPassword, newPassword }));
   return res.data;
 }
 

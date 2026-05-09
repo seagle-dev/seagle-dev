@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { fetchBooks, getBookCoverUrl } from '../../services/api';
-import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme';
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
 import usePaginatedList from '../hooks/usePaginatedList';
 import LoadingView from '../components/LoadingView';
 import EmptyState from '../components/EmptyState';
@@ -75,33 +75,39 @@ export default function TextbooksTab({ search = '', category = null }) {
   }, [router]);
 
   const renderBookItem = useCallback(({ item }) => (
-    <TouchableOpacity style={styles.bookRow} onPress={() => handleBookPress(item)} activeOpacity={0.7}>
-      <Image source={{ uri: item.image }} style={styles.bookCover} resizeMode="cover" />
+    <TouchableOpacity style={styles.bookCard} onPress={() => handleBookPress(item)} activeOpacity={0.9}>
+      <View style={styles.imageContainer}>
+        <Image source={{ uri: item.image }} style={styles.bookCover} resizeMode="cover" />
+      </View>
       <View style={styles.bookInfo}>
         <View>
           <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
           <Text style={styles.bookAuthor} numberOfLines={1}>{item.author}</Text>
           <View style={styles.badgesRow}>
-            <Badge label={item.category} color={COLORS.orange} />
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryBadgeText}>{item.category}</Text>
+            </View>
+            <View style={styles.readBadge}>
+              <Ionicons name="eye-outline" size={10} color={COLORS.navy} />
+              <Text style={styles.readBadgeText}>{item.readCount} Reads</Text>
+            </View>
           </View>
-          <Badge label={`Php ${item.price}`} variant="outline" color={COLORS.navy} style={styles.priceBadge} />
         </View>
 
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.actionButton} activeOpacity={0.8}>
-            <Ionicons name="cart-outline" size={13} color={COLORS.navy} />
-            <Text style={styles.actionButtonText}>Add to Cart</Text>
+          <TouchableOpacity style={styles.readButton} activeOpacity={0.8}>
+            <Ionicons name="book" size={14} color={COLORS.navy} />
+            <Text style={styles.readButtonText}>Read Now</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} activeOpacity={0.8}>
-            <Ionicons name="heart-outline" size={13} color={COLORS.navy} />
-            <Text style={styles.actionButtonText}>Add to Likes</Text>
+          <TouchableOpacity style={styles.favoriteButton} activeOpacity={0.8}>
+            <Ionicons name="heart-outline" size={18} color={COLORS.navy} />
           </TouchableOpacity>
         </View>
       </View>
     </TouchableOpacity>
   ), [handleBookPress]);
 
-  const renderSeparator = () => <View style={styles.separator} />;
+  const renderSeparator = () => <View style={{ height: SPACING.md }} />;
 
   const renderFooter = useCallback(() => (
     <PaginatedListFooter loading={loadingMore} />
@@ -131,74 +137,98 @@ export default function TextbooksTab({ search = '', category = null }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bgWhite },
-  listContent: { paddingTop: SPACING.sm, paddingBottom: SPACING.xl },
+  container: { flex: 1, backgroundColor: COLORS.bgPrimary },
+  listContent: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.xl },
 
-  bookRow: {
+  bookCard: {
     flexDirection: 'row',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.body || 14,
-    backgroundColor: COLORS.bgWhite,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    ...SHADOWS.small,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  imageContainer: {
+    ...SHADOWS.medium,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
   },
   bookCover: {
-    width: 75,
-    height: 110,
+    width: 85,
+    height: 120,
     borderRadius: RADIUS.md,
-    marginRight: SPACING.body || 14,
     backgroundColor: '#f0f0f0',
-    borderWidth: 1,
-    borderColor: COLORS.navy,
   },
   bookInfo: {
     flex: 1,
+    marginLeft: SPACING.lg,
     justifyContent: 'space-between',
   },
   bookTitle: {
-    fontSize: FONT_SIZES.regular,
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.navy,
-    lineHeight: 20,
-    marginBottom: 2,
+    lineHeight: 22,
+    marginBottom: 4,
     fontFamily: FONTS.serifBold,
   },
   bookAuthor: {
-    fontSize: FONT_SIZES.md,
+    fontSize: 12,
     color: COLORS.textSecondary,
     marginBottom: SPACING.sm,
     fontFamily: FONTS.regular,
   },
   badgesRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
     marginBottom: 6,
+    alignItems: 'center',
   },
-  priceBadge: {
-    marginBottom: 6,
+  categoryBadge: {
+    backgroundColor: COLORS.bgLight,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: COLORS.navy + '30',
+  },
+  categoryBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.navy,
+  },
+  readBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  readBadgeText: {
+    fontSize: 10,
+    color: COLORS.textSecondary,
   },
   actionRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: SPACING.sm,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
   },
-  actionButton: {
+  readButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: COLORS.navy,
-    borderRadius: RADIUS.lg,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 5,
-    gap: SPACING.xs,
+    backgroundColor: COLORS.orange,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: 8,
+    gap: 8,
+    ...SHADOWS.small,
   },
-  actionButtonText: {
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '600',
+  readButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
     color: COLORS.navy,
-    fontFamily: FONTS.medium,
   },
-  separator: {
-    height: 1,
-    backgroundColor: COLORS.border,
-    marginHorizontal: SPACING.lg,
+  favoriteButton: {
+    padding: 6,
   },
 });

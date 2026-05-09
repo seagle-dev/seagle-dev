@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import TextbooksTab from './TextbooksTab';
 import ModelsTab from './ModelsTab';
-import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme';
+import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
 
 const { width } = Dimensions.get('window');
 const CATEGORIES = ['All Categories', 'Anatomy', 'Physiology', 'Surgery', 'Medicine', 'Nursing'];
@@ -167,25 +167,27 @@ const styles = StyleSheet.create({
 
   // Search Section
   searchSection: {
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
-    paddingBottom: SPACING.xs,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.md,
     backgroundColor: COLORS.white,
+    gap: SPACING.sm,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.sm,
-    height: 46,
+    backgroundColor: COLORS.bgPrimary,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: SPACING.md,
+    height: 50,
     borderWidth: 1.5,
     borderColor: COLORS.navy,
+    ...SHADOWS.small,
   },
-  searchIcon: { marginRight: SPACING.sm },
+  searchIcon: { marginRight: SPACING.sm, opacity: 0.6 },
   searchInput: {
     flex: 1,
-    fontSize: FONT_SIZES.sm,
+    fontSize: 14,
     color: COLORS.textPrimary,
     fontFamily: FONTS.regular,
   },
@@ -195,48 +197,49 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.sm,
-    height: 46,
+    backgroundColor: COLORS.bgPrimary,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: SPACING.md,
+    height: 50,
     borderWidth: 1.5,
     borderColor: COLORS.navy,
-    marginTop: SPACING.sm,
+    ...SHADOWS.small,
   },
   categoryDropdownText: {
-    fontSize: FONT_SIZES.sm,
+    fontSize: 14,
     color: COLORS.textPrimary,
-    fontFamily: FONTS.regular,
+    fontFamily: FONTS.medium,
   },
 
   // Tab Bar
   tabBar: {
     flexDirection: 'row',
     backgroundColor: COLORS.white,
-    paddingTop: SPACING.xs,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+    paddingHorizontal: SPACING.lg,
   },
   tabItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
     position: 'relative',
+    marginRight: SPACING.md,
   },
   tabText: {
-    fontSize: FONT_SIZES.md,
+    fontSize: 15,
     fontWeight: '600',
-    color: COLORS.textMuted,
+    color: COLORS.textSecondary,
     fontFamily: FONTS.medium,
   },
   tabTextActive: {
     color: COLORS.navy,
-    fontFamily: FONTS.bold,
+    fontWeight: '700',
   },
   tabUnderline: {
     position: 'absolute',
     bottom: 0,
-    width: '60%',
+    left: SPACING.lg,
+    right: SPACING.lg,
     height: 3,
     backgroundColor: COLORS.navy,
     borderTopLeftRadius: 3,

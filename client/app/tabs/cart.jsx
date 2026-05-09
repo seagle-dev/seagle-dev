@@ -37,21 +37,23 @@ export default function CartScreen() {
 
   const renderItem = ({ item }) => (
     <View style={styles.cartCard}>
-      <Image source={{ uri: item.image }} style={styles.bookImage} />
+      <View style={styles.imageWrapper}>
+        <Image source={{ uri: item.image }} style={styles.bookImage} />
+      </View>
       <View style={styles.bookInfo}>
         <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
         <Text style={styles.bookAuthor}>{item.author}</Text>
         <Text style={styles.bookPrice}>Php {item.price.toLocaleString()}</Text>
       </View>
       <TouchableOpacity onPress={() => removeItem(item.id)} style={styles.removeBtn}>
-        <Ionicons name="trash-outline" size={20} color={COLORS.red} />
+        <Ionicons name="trash-outline" size={18} color={COLORS.red} />
       </TouchableOpacity>
     </View>
   );
 
   if (items.length === 0) {
     return (
-      <View style={styles.container}>
+      <View style={styles.emptyContainer}>
         <EmptyState 
           icon="cart-outline" 
           title="Your cart is empty" 
@@ -84,10 +86,11 @@ export default function CartScreen() {
             
             <TouchableOpacity style={styles.checkoutBtn} activeOpacity={0.8}>
               <Text style={styles.checkoutBtnText}>Proceed to Checkout</Text>
-              <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
+              <Ionicons name="arrow-forward" size={18} color={COLORS.white} />
             </TouchableOpacity>
           </View>
         }
+        showsVerticalScrollIndicator={false}
       />
     </View>
   );
@@ -104,7 +107,8 @@ function SummaryRow({ label, value, isTotal }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bgPrimary },
-  listContent: { padding: SPACING.lg },
+  emptyContainer: { flex: 1, backgroundColor: COLORS.bgPrimary, justifyContent: 'center' },
+  listContent: { padding: SPACING.lg, paddingBottom: 40 },
   cartCard: {
     flexDirection: 'row',
     backgroundColor: COLORS.white,
@@ -112,31 +116,39 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     marginBottom: SPACING.md,
     ...SHADOWS.small,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     alignItems: 'center',
   },
-  bookImage: {
-    width: 70,
-    height: 100,
+  imageWrapper: {
+    ...SHADOWS.small,
+    backgroundColor: COLORS.white,
     borderRadius: RADIUS.sm,
-    marginRight: SPACING.md,
+  },
+  bookImage: {
+    width: 65,
+    height: 90,
+    borderRadius: RADIUS.sm,
   },
   bookInfo: {
     flex: 1,
+    marginLeft: SPACING.md,
     justifyContent: 'center',
   },
   bookTitle: {
-    fontSize: FONT_SIZES.md,
+    fontSize: 15,
     fontWeight: '700',
     color: COLORS.navy,
     marginBottom: 2,
+    fontFamily: FONTS.serifBold,
   },
   bookAuthor: {
-    fontSize: FONT_SIZES.sm,
+    fontSize: 12,
     color: COLORS.textSecondary,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   bookPrice: {
-    fontSize: FONT_SIZES.md,
+    fontSize: 14,
     fontWeight: '700',
     color: COLORS.orange,
   },
@@ -149,11 +161,14 @@ const styles = StyleSheet.create({
     padding: SPACING.xl,
     marginTop: SPACING.lg,
     ...SHADOWS.small,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   summaryTitle: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '700',
     color: COLORS.navy,
+    fontFamily: FONTS.serifBold,
     marginBottom: SPACING.lg,
   },
   summaryRow: {
@@ -162,11 +177,11 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   summaryLabel: {
-    fontSize: FONT_SIZES.body,
+    fontSize: 14,
     color: COLORS.textSecondary,
   },
   summaryValue: {
-    fontSize: FONT_SIZES.body,
+    fontSize: 14,
     color: COLORS.textPrimary,
     fontWeight: '600',
   },
@@ -176,12 +191,12 @@ const styles = StyleSheet.create({
     marginVertical: SPACING.md,
   },
   totalLabel: {
-    fontSize: FONT_SIZES.lg,
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.navy,
   },
   totalValue: {
-    fontSize: FONT_SIZES.xl,
+    fontSize: 20,
     fontWeight: '800',
     color: COLORS.navy,
   },
@@ -191,26 +206,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: SPACING.lg,
-    borderRadius: RADIUS.pill,
+    borderRadius: RADIUS.lg,
     marginTop: SPACING.xl,
     gap: 12,
+    ...SHADOWS.small,
   },
   checkoutBtnText: {
     color: COLORS.white,
-    fontSize: FONT_SIZES.lg,
+    fontSize: 16,
     fontWeight: '700',
   },
   browseBtn: {
     backgroundColor: COLORS.orange,
     marginHorizontal: SPACING.xxl,
     paddingVertical: SPACING.lg,
-    borderRadius: RADIUS.pill,
+    borderRadius: RADIUS.lg,
     alignItems: 'center',
     marginTop: SPACING.xl,
+    ...SHADOWS.small,
   },
   browseBtnText: {
     color: COLORS.navy,
-    fontSize: FONT_SIZES.lg,
+    fontSize: 16,
     fontWeight: '700',
   },
 });

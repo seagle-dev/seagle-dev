@@ -69,20 +69,34 @@ export default function ModelsTab({ search = '', category = null }) {
     setSelectedModel(null);
   }, []);
 
-  const renderModelItem = useCallback(({ item }) => (
-    <TouchableOpacity style={styles.modelCard} onPress={() => handleModelPress(item)} activeOpacity={0.95}>
+  const renderModelItem = useCallback(({ item }) => {
+    const isPlaceholder = item.thumbnail === PLACEHOLDER_MODEL_THUMBNAIL;
+    return (
+    <TouchableOpacity style={styles.modelCard} onPress={() => handleModelPress(item)} activeOpacity={0.9}>
       <View style={styles.imageContainer}>
-        <Image source={{ uri: item.thumbnail }} style={styles.modelImage} resizeMode="cover" />
+        <Image 
+          source={isPlaceholder ? require('../../assets/artboard.png') : { uri: item.thumbnail }} 
+          style={styles.modelImage} 
+          resizeMode="cover" 
+        />
         <View style={styles.cardBadge}>
-          <Ionicons name="cube-outline" size={14} color={COLORS.white} />
+          <Ionicons name="cube" size={14} color={COLORS.white} />
         </View>
       </View>
       <View style={styles.modelInfo}>
-        <Text style={styles.modelName} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.modelCategory} numberOfLines={1}>{item.category}</Text>
+        <View>
+          <Text style={styles.modelName} numberOfLines={1}>{item.name}</Text>
+          <View style={styles.categoryRow}>
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryText}>{item.category}</Text>
+            </View>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={COLORS.navy + '50'} />
       </View>
     </TouchableOpacity>
-  ), [handleModelPress]);
+    );
+  }, [handleModelPress]);
 
   const renderFooter = useCallback(() => (
     <PaginatedListFooter loading={loadingMore} />
@@ -121,9 +135,9 @@ const styles = StyleSheet.create({
   listContent: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.xl },
 
   modelCard: {
-    backgroundColor: COLORS.bgWhite,
+    backgroundColor: COLORS.white,
     marginBottom: SPACING.lg,
-    borderRadius: RADIUS.xl,
+    borderRadius: RADIUS.lg,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -131,7 +145,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     width: '100%',
-    height: 200,
+    height: 180,
     backgroundColor: COLORS.navyDark,
     position: 'relative',
   },
@@ -143,23 +157,40 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: SPACING.md,
     right: SPACING.md,
-    backgroundColor: 'rgba(17, 26, 80, 0.6)',
+    backgroundColor: 'rgba(255, 145, 77, 0.9)', // Seagle Orange
     padding: 6,
     borderRadius: 8,
+    ...SHADOWS.small,
   },
   modelInfo: {
     padding: SPACING.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   modelName: {
-    fontSize: FONT_SIZES.xl,
+    fontSize: 18,
     fontWeight: '700',
     color: COLORS.navy,
-    marginBottom: 4,
+    marginBottom: 6,
     fontFamily: FONTS.serifBold,
   },
-  modelCategory: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    fontFamily: FONTS.regular,
+  categoryRow: {
+    flexDirection: 'row',
+  },
+  categoryBadge: {
+    backgroundColor: COLORS.bgLight,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.navy + '20',
+  },
+  categoryText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.navy,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });
