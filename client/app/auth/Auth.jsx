@@ -17,6 +17,8 @@ import {
 } from 'react-native'
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme'
 
+const SHOW_GOOGLE_SIGN_IN = false
+
 export default function Auth() {
   const { signIn } = useAuth()
   const router = useRouter()
@@ -121,6 +123,8 @@ export default function Auth() {
           </TouchableOpacity>
         </View>
 
+        {SHOW_GOOGLE_SIGN_IN && (
+          <>
         <View style={styles.dividerRow}>
           <View style={styles.divider} />
           <Text style={styles.dividerText}>OR</Text>
@@ -131,9 +135,11 @@ export default function Auth() {
           <Image source={require('../../assets/google.png')} style={styles.googleIcon} />
           <Text style={styles.googleText}>Google</Text>
         </TouchableOpacity>
+          </>
+        )}
 
         <Text style={styles.terms}>
-          By clicking Sign in, Continue with Google you agree to seagle{' '}
+          By clicking Sign in you agree to seagle{' '}
           <Text style={styles.link}>Terms of Use</Text> and <Text style={styles.link}>Privacy Policy</Text>.
         </Text>
 
