@@ -31,6 +31,7 @@ const PdfViewer = memo(function PdfViewer({
   onRequestModelContext,
   onPageLoaded,
   onHotspotClick,
+  onScroll,
   onError,
 }) {
   const webViewRef = useRef(null);
@@ -174,12 +175,15 @@ const PdfViewer = memo(function PdfViewer({
           case 'error':
             onError?.(data.message);
             break;
+          case 'scroll':
+            onScroll?.(data);
+            break;
         }
       } catch (err) {
         console.warn('[PdfViewer] Error parsing message:', err);
       }
     },
-    [annotations, onPageLoaded, onHotspotClick, onError, onRequestModelContext],
+    [annotations, onPageLoaded, onHotspotClick, onScroll, onError, onRequestModelContext],
   );
 
   // Listen for web messages

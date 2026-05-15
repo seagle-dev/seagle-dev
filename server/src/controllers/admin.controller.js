@@ -206,6 +206,18 @@ const uploadModelThumbnail = asyncHandler(async (req, res) => {
   return res.json({ data: { thumbnail: thumbnailUrl, view_state: parsedViewState } });
 });
 
+const updateModelViewState = asyncHandler(async (req, res) => {
+  const modelId = requirePositiveInt(req.params.id, 'Invalid model id');
+  const viewState = parseModelViewState(req.body?.viewState || req.body);
+  
+  if (!viewState) {
+    return res.status(400).json({ message: 'Invalid viewState provided' });
+  }
+
+  await adminService.updateModelViewState(modelId, viewState);
+  return res.json({ data: { view_state: viewState } });
+});
+
 async function removeModel(req, res) {
   try {
     const id = requirePositiveInt(req.params.id, 'Invalid model id');
@@ -268,6 +280,6 @@ async function detectImages(req, res) {
 
 module.exports = {
   getBooks, getBookPdf, getBookCover, uploadBook, removeBook,
-  getModels, getModelFile, getModelThumbnail, uploadModel, uploadModelThumbnail, removeModel,
+  getModels, getModelFile, getModelThumbnail, uploadModel, uploadModelThumbnail, removeModel, updateModelViewState,
   createMapping, getMappings, deleteMapping, detectImages
 };

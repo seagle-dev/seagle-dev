@@ -20,6 +20,7 @@ import {
   StyleSheet,
   Platform,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,6 +47,23 @@ export default function ReadingTab({ book }) {
   const [modelContextMap, setModelContextMap] = useState({});
   const [modelContextVersion, setModelContextVersion] = useState(0);
   const modelContextMapRef = useRef({});
+
+  // Animation constants
+  const HEADER_HEIGHT = Platform.OS === 'ios' ? 110 : 80;
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const clampedScroll = Animated.diffClamp(scrollY, 0, HEADER_HEIGHT);
+  
+  const headerTranslate = clampedScroll.interpolate({
+    inputRange: [0, HEADER_HEIGHT],
+    outputRange: [0, -HEADER_HEIGHT],
+    extrapolate: 'clamp',
+  });
+
+  const headerOpacity = clampedScroll.interpolate({
+    inputRange: [0, HEADER_HEIGHT * 0.75, HEADER_HEIGHT],
+    outputRange: [1, 1, 0],
+    extrapolate: 'clamp',
+  });
 
   const bookId = book?.id;
   const pdfUrl = bookId ? getBookPdfUrl(bookId) : null;
@@ -124,6 +142,12 @@ export default function ReadingTab({ book }) {
   const handleCloseModal = useCallback(() => {
     setSelectedAnnotation(null);
   }, []);
+
+  const handleScroll = useCallback((event) => {
+    if (event.scrollY != null) {
+      scrollY.setValue(event.scrollY);
+    }
+  }, [scrollY]);
 
   const storeModelContext = useCallback((modelContext) => {
     if (!modelContext?.id) return;
@@ -238,7 +262,13 @@ export default function ReadingTab({ book }) {
   return (
     <View style={styles.container}>
       {/* Top Header Bar */}
-      <View style={styles.header}>
+      <Animated.View style={[
+        styles.header, 
+        { 
+          transform: [{ translateY: headerTranslate }],
+          opacity: headerOpacity,
+        }
+      ]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
           <Ionicons name="chevron-back" size={24} color={COLORS.navy} />
         </TouchableOpacity>
@@ -252,7 +282,7 @@ export default function ReadingTab({ book }) {
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
           <Ionicons name="close" size={24} color={COLORS.navy} />
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* PDF Viewer */}
       <View style={[styles.pdfContainer, selectedAnnotation && styles.pdfContainerDimmed]}>
@@ -265,6 +295,7 @@ export default function ReadingTab({ book }) {
           modelContextVersion={modelContextVersion}
           onPageLoaded={handlePageLoaded}
           onHotspotClick={handleHotspotClick}
+          onScroll={handleScroll}
           onRequestModelContext={async (modelId) => {
             if (modelId == null) return null;
 
@@ -301,21 +332,27 @@ export default function ReadingTab({ book }) {
 
         {/* Page info badge (top-right overlay) */}
         {totalPages && (
-          <View style={styles.pageBadge}>
+          <Animated.View style={[
+            styles.pageBadge,
+            { transform: [{ translateY: headerTranslate }] }
+          ]}>
             <Text style={styles.pageBadgeText}>
               {currentPage} / {totalPages}
             </Text>
-          </View>
+          </Animated.View>
         )}
 
         {/* Annotation count badge (top-left overlay) */}
         {annotations.length > 0 && (
-          <View style={styles.annotBadge}>
+          <Animated.View style={[
+            styles.annotBadge,
+            { transform: [{ translateY: headerTranslate }] }
+          ]}>
             <Ionicons name="cube-outline" size={12} color={COLORS.white} />
             <Text style={styles.annotBadgeText}>
               {annotations.length} model{annotations.length !== 1 ? 's' : ''}
             </Text>
-          </View>
+          </Animated.View>
         )}
 
         {/* Annotation loading indicator */}
@@ -357,6 +394,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0ece4',
   },
   header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -366,6 +407,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FCF4DD',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.05)',
+    zIndex: 100,
   },
   headerBtn: {
     padding: SPACING.xs,
