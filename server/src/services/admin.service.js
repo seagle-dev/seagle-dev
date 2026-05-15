@@ -221,6 +221,14 @@ async function updateModelThumbnail(modelId, thumbnailBuffer, viewState = null) 
   return thumbnailPath;
 }
 
+/**
+ * Update ONLY the view state for a model.
+ */
+async function updateModelViewState(modelId, viewState) {
+  const viewStateJson = viewState ? JSON.stringify(viewState) : null;
+  await db.execute('UPDATE models_3d SET view_state = ? WHERE id = ?', [viewStateJson, modelId]);
+}
+
 async function deleteModel(id) {
   const [rows] = await db.execute('SELECT file_url, thumbnail FROM models_3d WHERE id = ?', [id]);
   if (rows && rows[0]) {

@@ -186,6 +186,11 @@ export async function deleteModel(modelId) {
   await api.delete(`/admin/models/${modelId}`);
 }
 
+export async function updateModelViewState(modelId, viewState) {
+  const res = await api.patch(`/admin/models/${modelId}/view-state`, { viewState });
+  return unwrap(res);
+}
+
 /**
  * Helper: get auth token for use with custom loaders (Three.js).
  */

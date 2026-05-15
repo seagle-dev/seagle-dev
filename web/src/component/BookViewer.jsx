@@ -1,14 +1,16 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { fetchBookPdf, fetchMappings, fetchModels } from '../services/api';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { fetchBookPdf, fetchMappings, fetchModels, updateModelViewState } from '../services/api';
 import { Worker, Viewer, SpecialZoomLevel, ScrollMode } from '@react-pdf-viewer/core';
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/default-layout/lib/styles/index.css';
 import ThreeModelViewer from './ThreeModelViewer';
 
-// ...existing code... (InlineModelOverlay stays the same)
 const InlineModelOverlay = React.memo(function InlineModelOverlay({ mapping, model }) {
   const [expanded, setExpanded] = useState(false);
+  const [is3D, setIs3D] = useState(false);
   const [selectedBone, setSelectedBone] = useState(null);
+  const [currentViewState, setCurrentViewState] = useState(model?.view_state);
+  const saveTimeoutRef = useRef(null);
 
   if (!model?.file_url) {
     return (
@@ -41,6 +43,21 @@ const InlineModelOverlay = React.memo(function InlineModelOverlay({ mapping, mod
     setSelectedBone(info);
   }, []);
 
+  const handleViewStateChange = useCallback((state) => {
+    setCurrentViewState(state);
+    
+    // Debounce save to DB
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      updateModelViewState(model.id, state).catch(err => console.error('Failed to save view state:', err));
+    }, 2000);
+  }, [model.id]);
+
+  const toggleMode = (e) => {
+    e.stopPropagation();
+    setIs3D(!is3D);
+  };
+
   return (
     <>
       <div style={{
@@ -51,10 +68,12 @@ const InlineModelOverlay = React.memo(function InlineModelOverlay({ mapping, mod
         height: `${mapping.height * 100}%`,
         zIndex: 20,
         borderRadius: '4px',
-        overflow: 'hidden',
+        overflow: 'visible', // Changed from hidden to allow buttons below
         border: '1px solid rgba(0,0,0,0.12)',
         boxShadow: '0 1px 6px rgba(0,0,0,0.1)',
+        background: is3D ? '#f0f0f0' : 'transparent',
       }}>
+        {/* Header (Inside) */}
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -63,33 +82,84 @@ const InlineModelOverlay = React.memo(function InlineModelOverlay({ mapping, mod
           padding: '2px 6px',
           zIndex: 30,
           borderBottom: '1px solid rgba(0,0,0,0.06)',
+          borderTopLeftRadius: '4px',
+          borderTopRightRadius: '4px',
         }}>
           <span style={{
             color: '#333', fontSize: '10px', fontWeight: '600',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '85%',
           }}>
             {model.name || mapping.label || '3D Model'}
           </span>
+        </div>
+
+        {/* Main Content Area */}
+        <div style={{ width: '100%', height: '100%', paddingTop: '22px', boxSizing: 'border-box', overflow: 'hidden' }}>
+          {is3D ? (
+            <ThreeModelViewer
+              modelUrl={model.file_url}
+              alt={model.name}
+              compact={true}
+              onPartClick={handlePartClick}
+              initialViewState={currentViewState}
+              onViewStateChange={handleViewStateChange}
+            />
+          ) : (
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.1)' }}>
+              {model.thumbnail ? (
+                <img src={model.thumbnail} alt={model.name} style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: 0.8 }} />
+              ) : (
+                <div style={{ color: '#aaa', fontSize: '10px', fontStyle: 'italic' }}>2D Mode</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons (Positioned below the frame, aligned right) */}
+        <div style={{
+          position: 'absolute',
+          bottom: '-34px',
+          right: '0',
+          display: 'flex',
+          gap: '8px',
+          zIndex: 40,
+        }}>
+          <button
+            onClick={toggleMode}
+            style={{
+              background: is3D ? '#2ecc71' : '#fff',
+              color: is3D ? '#fff' : '#2ecc71',
+              border: '2px solid #2ecc71',
+              borderRadius: '6px',
+              padding: '4px 12px',
+              fontSize: '11px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {is3D ? 'VIEW 2D' : 'VIEW 3D'}
+          </button>
           <button
             onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
             style={{
-              background: 'transparent', color: '#4a90d9', border: 'none',
-              borderRadius: '3px', padding: '1px 5px', fontSize: '12px',
-              cursor: 'pointer', lineHeight: '16px',
+              background: '#fff',
+              color: '#4a90d9',
+              border: '2px solid #4a90d9',
+              borderRadius: '6px',
+              padding: '4px 10px',
+              fontSize: '11px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s',
             }}
-            title="View fullscreen">
+            title="Full Screen"
+          >
             ⛶
           </button>
-        </div>
-
-        <div style={{ width: '100%', height: '100%', paddingTop: '22px', boxSizing: 'border-box' }}>
-          <ThreeModelViewer
-            modelUrl={model.file_url}
-            alt={model.name}
-            compact={true}
-            onPartClick={handlePartClick}
-            initialViewState={model.view_state}
-          />
         </div>
       </div>
 
@@ -138,7 +208,8 @@ const InlineModelOverlay = React.memo(function InlineModelOverlay({ mapping, mod
               alt={model.name}
               compact={false}
               onPartClick={handlePartClick}
-              initialViewState={model.view_state}
+              initialViewState={currentViewState}
+              onViewStateChange={handleViewStateChange}
             />
           </div>
         </div>
@@ -156,6 +227,8 @@ export default function BookViewer({ book }) {
   const [loading, setLoading] = useState(true);
   const [viewerKey, setViewerKey] = useState(0);
   const [show3DDiagrams, setShow3DDiagrams] = useState(true);
+  const [showHeader, setShowHeader] = useState(true);
+  const lastScrollTop = useRef(0);
 
   useEffect(() => {
     if (book?.id) {
@@ -185,7 +258,6 @@ export default function BookViewer({ book }) {
     };
   }, [book]);
 
-  // ...existing code... (rest stays the same)
   useEffect(() => {
     if (book?.id && pageNumber) {
       if (allMappings[pageNumber]) return;
@@ -213,6 +285,16 @@ export default function BookViewer({ book }) {
     setPageNumber(page);
     setViewerKey(k => k + 1);
   }
+
+  const handleScroll = useCallback((e) => {
+    const currentScrollTop = e.target.scrollTop;
+    if (currentScrollTop > lastScrollTop.current && currentScrollTop > 80) {
+      setShowHeader(false);
+    } else if (currentScrollTop < lastScrollTop.current) {
+      setShowHeader(true);
+    }
+    lastScrollTop.current = currentScrollTop;
+  }, []);
 
   const renderPage = useCallback((props) => {
     const currentPageMappings = pageMappings.filter((m) => m.page_number === props.pageIndex + 1);
@@ -250,14 +332,19 @@ export default function BookViewer({ book }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', background: '#fafafa' }}>
+      {/* Header with Animation */}
       <div style={{
-        padding: '10px 24px',
+        padding: showHeader ? '10px 24px' : '0 24px',
+        height: showHeader ? 'auto' : '0',
+        overflow: 'hidden',
         background: '#2c3e50',
-        borderBottom: '2px solid #34495e',
+        borderBottom: showHeader ? '2px solid #34495e' : 'none',
         flexShrink: 0,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        transition: 'all 0.3s ease-in-out',
+        zIndex: 100,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <h2 style={{ margin: 0, color: '#fff', fontSize: '18px', fontWeight: '500' }}>
@@ -319,7 +406,11 @@ export default function BookViewer({ book }) {
       </div>
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
-        <div style={{ flex: 1, overflow: 'auto', background: '#e8e8e8' }}>
+        {/* Main Viewer with Scroll Event */}
+        <div 
+          style={{ flex: 1, overflow: 'auto', background: '#e8e8e8' }}
+          onScroll={handleScroll}
+        >
           {pdfUrl ? (
             <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
               <Viewer

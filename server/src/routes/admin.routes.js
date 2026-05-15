@@ -34,6 +34,7 @@ router.post('/models', verifyToken, verifyAdmin, upload.single('model'), adminCo
 router.get('/models/:id/file', verifyToken, adminController.getModelFile);            // Stream GLB/GLTF
 router.get('/models/:id/thumbnail', adminController.getModelThumbnail);               // Stream thumbnail (public)
 router.post('/models/:id/thumbnail', verifyToken, verifyAdmin, upload.single('thumbnail'), adminController.uploadModelThumbnail);
+router.patch('/models/:id/view-state', verifyToken, verifyAdmin, adminController.updateModelViewState);
 router.delete('/models/:id', verifyToken, verifyAdmin, adminController.removeModel);
 
 // ===== Mappings =====

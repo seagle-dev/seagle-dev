@@ -43,7 +43,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 10px 0;
+      padding: 110px 0 15px 0;
       gap: 15px;
     }
     .page-container {
@@ -67,9 +67,17 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       width: 100%; height: 100%;
       pointer-events: none;
     }
+    .hotspot-wrapper {
+      position: absolute;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hotspot-wrapper * {
+      pointer-events: auto;
+    }
     .hotspot {
       position: absolute;
-      pointer-events: auto;
+      inset: 0;
       cursor: default;
       border: 0;
       border-radius: 4px;
@@ -155,42 +163,53 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       display: none;
     }
     .hotspot-open {
-      position: absolute;
-      top: 4px;
-      right: 4px;
-      z-index: 4;
+      height: 20px;
       border: none;
       border-radius: 4px;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(17, 26, 80, 0.85);
       color: #fff;
-      font-size: 10px;
-      padding: 4px 6px;
-      line-height: 1;
+      font-size: 11px;
+      padding: 0 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
       display: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
     }
-    .hotspot.is-3d-active .hotspot-open {
-      display: block;
+    .hotspot-wrapper.is-3d-active .hotspot-open {
+      display: flex;
+    }
+    .hotspot-controls {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-top: 4px;
+      z-index: 20;
+      pointer-events: auto;
     }
     .hotspot-toggle {
-      position: absolute;
-      top: 4px;
-      left: 4px;
-      z-index: 5;
-      min-width: 34px;
-      height: 24px;
-      border: 1px solid rgba(255,255,255,0.9);
-      border-radius: 12px;
-      background: rgba(17, 26, 80, 0.82);
-      color: #fff;
+      min-width: 32px;
+      height: 20px;
+      border: 1px solid rgba(17, 26, 80, 0.15);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.95);
+      color: #111A50;
       font-size: 10px;
       font-weight: 700;
-      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.22);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
-    .hotspot.is-3d-active .hotspot-toggle {
-      background: rgba(255, 140, 66, 0.92);
+    .hotspot-wrapper.is-3d-active .hotspot-toggle {
+      background: rgba(255, 140, 66, 0.95);
+      color: #fff;
+      border-color: rgba(255, 140, 66, 0.2);
     }
     .hotspot-fallback {
       position: absolute;
@@ -769,16 +788,22 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       layer.innerHTML = '';
       annotations.forEach(ann => {
         const viewerKey = getInlineViewerKey(ann);
+        const wrapper = document.createElement('div');
+        wrapper.className = 'hotspot-wrapper';
+        if (activeInlineViewerKeys.has(viewerKey)) {
+          wrapper.classList.add('is-3d-active');
+        }
+        wrapper.style.left = (ann.x * 100) + '%';
+        wrapper.style.top = (ann.y * 100) + '%';
+        wrapper.style.width = (ann.width * 100) + '%';
+        wrapper.style.height = (ann.height * 100) + '%';
+
         const div = document.createElement('div');
         div.className = 'hotspot';
         div.dataset.inlineViewerKey = viewerKey;
         if (activeInlineViewerKeys.has(viewerKey)) {
           div.classList.add('is-3d-active');
         }
-        div.style.left = (ann.x * 100) + '%';
-        div.style.top = (ann.y * 100) + '%';
-        div.style.width = (ann.width * 100) + '%';
-        div.style.height = (ann.height * 100) + '%';
 
         const viewerEl = document.createElement('div');
         viewerEl.className = 'hotspot-viewer';
@@ -792,7 +817,8 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         toggleButton.textContent = activeInlineViewerKeys.has(viewerKey) ? '2D' : '3D';
         toggleButton.onclick = (e) => {
           e.stopPropagation();
-          const enabled = !div.classList.contains('is-3d-active');
+          const enabled = !wrapper.classList.contains('is-3d-active');
+          wrapper.classList.toggle('is-3d-active', enabled);
           div.classList.toggle('is-3d-active', enabled);
           toggleButton.textContent = enabled ? '2D' : '3D';
           toggleButton.setAttribute('aria-label', enabled ? 'Show original image' : 'Show 3D model');
@@ -805,19 +831,17 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
             stopInlineModelViewer(viewerKey);
           }
         };
-        div.appendChild(toggleButton);
 
         // Visible only after the inline 3D preview is enabled.
         const openButton = document.createElement('button');
         openButton.type = 'button';
         openButton.className = 'hotspot-open';
         openButton.setAttribute('aria-label', 'Open model');
-        openButton.innerHTML = '<span style="display:block;width:24px;height:8px;background:#FF8C42;border:2px solid #fff;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,0.22);"></span>';
+        openButton.textContent = '⛶';
         openButton.onclick = (e) => {
           e.stopPropagation();
           sendMessage({ type: 'hotspotClick', annotation: ann });
         };
-        div.appendChild(openButton);
 
         if (ann.thumbnailUrl) {
           const thumb = document.createElement('img');
@@ -829,9 +853,16 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         const label = document.createElement('span');
         label.className = 'hotspot-label';
         label.textContent = ann.displayName || ann.label || '3D Model';
-        div.appendChild(label);
 
-        layer.appendChild(div);
+        const controls = document.createElement('div');
+        controls.className = 'hotspot-controls';
+        controls.appendChild(toggleButton);
+        controls.appendChild(openButton);
+
+        wrapper.appendChild(div);
+        wrapper.appendChild(controls);
+        wrapper.appendChild(label);
+        layer.appendChild(wrapper);
 
         if (activeInlineViewerKeys.has(viewerKey)) {
           try { initInlineModelViewer(viewerEl, ann); } catch (err) { console.error('initInlineModelViewer failed', err); }
@@ -856,21 +887,42 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
           // Refresh visible page's annotations if it's the one we just received
           const el = document.getElementById('page-' + pg);
           if (el && pageRenderState.get(pg)?.rendered) renderAnnotationsForPage(pg);
-          } else if (data.type === 'modelContextResponse') {
-            if (data.modelContext?.id != null) {
-              modelContextCache.set(String(data.modelContext.id), data.modelContext);
-            }
-            const waiter = modelContextWaiters.get(data.requestId);
-            if (waiter) {
-              modelContextWaiters.delete(data.requestId);
-              waiter(data.modelContext || null);
-            }
+        } else if (data.type === 'modelContextResponse') {
+          if (data.modelContext?.id != null) {
+            modelContextCache.set(String(data.modelContext.id), data.modelContext);
+          }
+          const waiter = modelContextWaiters.get(data.requestId);
+          if (waiter) {
+            modelContextWaiters.delete(data.requestId);
+            waiter(data.modelContext || null);
+          }
         }
       } catch (e) { }
     }
 
     window.addEventListener('message', handleMessage);
     document.addEventListener('message', handleMessage);
+
+    // ---- Scroll Tracking ----
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY;
+          sendMessage({
+            type: 'scroll',
+            scrollY: currentScrollY,
+            deltaY: currentScrollY - lastScrollY
+          });
+          lastScrollY = currentScrollY;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    }, { passive: true });
+
     loadPdf();
   </script>
 </body>
