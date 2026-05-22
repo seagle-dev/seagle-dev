@@ -52,7 +52,7 @@ export default function Auth() {
     >
       <ScrollView contentContainerStyle={styles.container}>
         <Image
-          source={require('../../assets/seagle.png')}
+          source={require('../../assets/logo/Seagle_Logomark V1_01.svg')}
           style={styles.logo}
           resizeMode="contain"
         />

@@ -27,7 +27,7 @@ const TopHeader = ({
   const cartCount = 2;
   const notificationCount = 3;
   const hasTitle = Boolean(title);
-  const showHeaderCart = showCart && !showBackButton;
+  const showHeaderCart = false; // Disabled per request
   const showHeaderNotifications = showNotifications && !showBackButton;
   const showHeaderProfile = showProfile && !showBackButton;
 
@@ -60,7 +60,7 @@ const TopHeader = ({
             </TouchableOpacity>
           ) : (
             <View style={styles.logoContainer}>
-              <Image source={require('../../assets/logo-icon-top.png')} style={styles.logo} resizeMode="contain" />
+              <Image source={require('../../assets/logo/Seagle_Logomark V1_03.svg')} style={styles.logo} resizeMode="contain" />
             </View>
           )}
         </View>

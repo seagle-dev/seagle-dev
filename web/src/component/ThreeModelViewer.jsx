@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { getAuthToken } from '../services/api';
 
-export default function ThreeModelViewer({ modelUrl, alt, compact, onPartClick, initialViewState }) {
+export default function ThreeModelViewer({ modelUrl, alt, compact, onPartClick, initialViewState, onViewStateChange }) {
   const mountRef = useRef(null);
   const rendererRef = useRef(null);
   const sceneRef = useRef(null);
@@ -13,6 +13,24 @@ export default function ThreeModelViewer({ modelUrl, alt, compact, onPartClick, 
   const animRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Helper to report state
+  const reportState = useCallback(() => {
+    if (!onViewStateChange || !cameraRef.current || !controlsRef.current) return;
+    onViewStateChange({
+      cameraPosition: {
+        x: cameraRef.current.position.x,
+        y: cameraRef.current.position.y,
+        z: cameraRef.current.position.z,
+      },
+      controlsTarget: {
+        x: controlsRef.current.target.x,
+        y: controlsRef.current.target.y,
+        z: controlsRef.current.target.z,
+      },
+      fov: cameraRef.current.fov,
+    });
+  }, [onViewStateChange]);
 
   useEffect(() => {
     if (!mountRef.current || !modelUrl) return;
@@ -54,6 +72,12 @@ export default function ThreeModelViewer({ modelUrl, alt, compact, onPartClick, 
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controlsRef.current = controls;
+
+    // Report state on change
+    controls.addEventListener('change', () => {
+      // Debounce or rate-limit could be added if needed
+      reportState();
+    });
 
     // Animate
     function animate() {
@@ -157,6 +181,9 @@ export default function ThreeModelViewer({ modelUrl, alt, compact, onPartClick, 
 
             setLoading(false);
             URL.revokeObjectURL(blobUrl);
+            
+            // Initial report
+            reportState();
           },
           undefined,
           (err) => {
@@ -213,7 +240,7 @@ export default function ThreeModelViewer({ modelUrl, alt, compact, onPartClick, 
         container.removeChild(renderer.domElement);
       }
     };
-  }, [modelUrl, onPartClick, initialViewState]);
+  }, [modelUrl, onPartClick, initialViewState, reportState]);
 
   return (
     <div ref={mountRef} style={{ width: '100%', height: '100%', position: 'relative' }}>

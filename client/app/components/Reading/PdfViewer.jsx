@@ -14,28 +14,72 @@
  *   onHotspotClick — (annotation) => void
  *   onError       — (message) => void
  */
-import React, { useRef, useEffect, useCallback, memo } from 'react';
+import React, { useRef, useEffect, useCallback, memo, forwardRef, useImperativeHandle, useState } from 'react';
 import { StyleSheet, Platform, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { getModelThumbnailUrl, getModelFileUrl } from '../../../services/api';
 import getPdfViewerHtml from './pdfViewerHtml';
 import * as FileSystem from 'expo-file-system/legacy';
 
-const PdfViewer = memo(function PdfViewer({
+const PdfViewer = memo(forwardRef(function PdfViewer({
   pdfUrl,
   authToken,
   page,
   annotations = [],
+  userAnnotations = {},
   modelContextMap = {},
   modelContextVersion = 0,
+  activeTool,
+  onUndoRequest,
+  onClearRequest,
+  onDirty,
+  onAnnotationsExport,
   onRequestModelContext,
   onPageLoaded,
   onHotspotClick,
+  onScroll,
   onError,
-}) {
+}, ref) {
   const webViewRef = useRef(null);
   const iframeRef = useRef(null);
   const lastSentAnnotationsKey = useRef(null);
+  const [viewerReady, setViewerReady] = useState(false);
+
+  const postToViewer = useCallback((payload) => {
+    const msg = JSON.stringify(payload);
+    if (Platform.OS === 'web') {
+      iframeRef.current?.contentWindow?.postMessage(msg, '*');
+    } else {
+      webViewRef.current?.postMessage(msg);
+    }
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    getAnnotations: () => {
+      postToViewer({ type: 'requestAnnotations' });
+    },
+  }));
+
+  // Send tool changes to WebView
+  useEffect(() => {
+    if (!viewerReady) return;
+    postToViewer({ type: 'setTool', tool: activeTool });
+  }, [activeTool, postToViewer, viewerReady]);
+
+  // Handle actions
+  useEffect(() => {
+    if (!viewerReady) return;
+    if (onUndoRequest > 0) {
+      postToViewer({ type: 'undo' });
+    }
+  }, [onUndoRequest, postToViewer, viewerReady]);
+
+  useEffect(() => {
+    if (!viewerReady) return;
+    if (onClearRequest > 0) {
+      postToViewer({ type: 'clear' });
+    }
+  }, [onClearRequest, postToViewer, viewerReady]);
 
   // Generate the HTML once (pdfUrl + token are stable for a given book)
   const html = React.useMemo(
@@ -43,20 +87,16 @@ const PdfViewer = memo(function PdfViewer({
     [pdfUrl, authToken],
   );
 
-  // Send message helper
-  const postToViewer = (payload) => {
-    const msg = JSON.stringify(payload);
-    if (Platform.OS === 'web') {
-      iframeRef.current?.contentWindow?.postMessage(msg, '*');
-    } else {
-      webViewRef.current?.postMessage(msg);
-    }
-  };
+  useEffect(() => {
+    setViewerReady(false);
+    lastSentAnnotationsKey.current = null;
+  }, [html]);
 
   const pendingModelContextRequests = useRef(new Map());
 
   // Send annotations to the WebView when they change - include modelBase64 for local files
   useEffect(() => {
+    if (!viewerReady) return;
     let mounted = true;
     const key = `${page}:${modelContextVersion}:${annotations.map((a) => a.id).join(',')}`;
     if (key === lastSentAnnotationsKey.current) return;
@@ -115,7 +155,12 @@ const PdfViewer = memo(function PdfViewer({
     prepareAndPost();
 
     return () => { mounted = false; };
-  }, [annotations, page, modelContextMap, modelContextVersion]);
+  }, [annotations, page, modelContextMap, modelContextVersion, postToViewer, viewerReady]);
+
+  useEffect(() => {
+    if (!viewerReady) return;
+    postToViewer({ type: 'setUserAnnotations', data: userAnnotations || {} });
+  }, [userAnnotations, postToViewer, viewerReady]);
 
   // Handle messages from the WebView
   const handleMessage = useCallback(
@@ -128,17 +173,13 @@ const PdfViewer = memo(function PdfViewer({
         if (!data) return;
         
         switch (data.type) {
+          case 'viewerReady':
+            setViewerReady(true);
+            break;
           case 'pageLoaded':
             onPageLoaded?.(data.page, data.totalPages);
             break;
           case 'hotspotClick':
-            console.log('[PdfViewer] hotspotClick ids:', {
-              annotationId: data.annotation?.id,
-              annotationIdType: typeof data.annotation?.id,
-              firstAnnotationId: annotations[0]?.id,
-              firstAnnotationIdType: typeof annotations[0]?.id,
-              annotationsCount: annotations.length,
-            });
             const fullAnnotation = annotations.find(
               (a) => a.id === data.annotation?.id,
             );
@@ -174,12 +215,21 @@ const PdfViewer = memo(function PdfViewer({
           case 'error':
             onError?.(data.message);
             break;
+          case 'scroll':
+            onScroll?.(data);
+            break;
+          case 'dirty':
+            onDirty?.();
+            break;
+          case 'annotationsData':
+            onAnnotationsExport?.(data.data);
+            break;
         }
       } catch (err) {
         console.warn('[PdfViewer] Error parsing message:', err);
       }
     },
-    [annotations, onPageLoaded, onHotspotClick, onError, onRequestModelContext],
+    [annotations, onPageLoaded, onHotspotClick, onScroll, onError, onRequestModelContext, onDirty, onAnnotationsExport, postToViewer],
   );
 
   // Listen for web messages
@@ -218,13 +268,14 @@ const PdfViewer = memo(function PdfViewer({
       allowUniversalAccessFromFileURLs
       mixedContentMode="always"
       onMessage={handleMessage}
+      onLoadStart={() => setViewerReady(false)}
       scrollEnabled={true}
       bounces={true}
       showsVerticalScrollIndicator={true}
       showsHorizontalScrollIndicator={false}
     />
   );
-});
+}));
 
 const styles = StyleSheet.create({
   webView: {

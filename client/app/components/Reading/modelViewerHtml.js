@@ -80,6 +80,16 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
       stroke: currentColor;
       pointer-events: none;
     }
+    #drawing-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 15;
+    }
+    #drawing-canvas.active {
+      pointer-events: auto;
+    }
     .spin {
       width: 32px; height: 32px;
       border: 3px solid rgba(255,255,255,0.25); border-top-color: #FF8C42;
@@ -139,6 +149,14 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
     console.log('[modelViewerHtml] Three.js imports successful:', { THREE: !!THREE, GLTFLoader: !!GLTFLoader, OrbitControls: !!OrbitControls });
 
     const loadingEl = document.getElementById('loading');
+    
+    // ---- Drawing/Pin State ----
+    let activeTool = null;
+    let isDrawing = false;
+    let currentPath = [];
+    const drawings = [];
+    const pins = [];
+    const pinObjects = new Map(); // id -> THREE.Group
 
     function sendMessage(data) {
       console.log('[modelViewerHtml] sendMessage:', data);
@@ -146,6 +164,166 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
         window.ReactNativeWebView.postMessage(JSON.stringify(data));
       } else {
         window.parent.postMessage(JSON.stringify(data), '*');
+      }
+    }
+
+    const drawingCanvas = document.createElement('canvas');
+    drawingCanvas.id = 'drawing-canvas';
+    drawingCanvas.style.touchAction = 'none';
+    document.body.appendChild(drawingCanvas);
+    const dctx = drawingCanvas.getContext('2d');
+
+    function resizeDrawingCanvas() {
+      drawingCanvas.width = window.innerWidth;
+      drawingCanvas.height = window.innerHeight;
+      renderDrawings();
+    }
+    window.addEventListener('resize', resizeDrawingCanvas);
+    resizeDrawingCanvas();
+
+    function setupDrawingListeners() {
+      const getPos = (e) => {
+        const touch = e.touches ? e.touches[0] : e;
+        return { x: touch.clientX, y: touch.clientY };
+      };
+
+      const start = (e) => {
+        if (!activeTool || activeTool === 'text') return;
+        isDrawing = true;
+        const pos = getPos(e);
+        currentPath = [pos];
+        dctx.beginPath();
+        dctx.moveTo(pos.x, pos.y);
+        
+        if (activeTool === 'pen') {
+          dctx.strokeStyle = '#2c3e50';
+          dctx.lineWidth = 3;
+          dctx.globalCompositeOperation = 'source-over';
+        } else if (activeTool === 'highlighter') {
+          dctx.strokeStyle = 'rgba(255, 235, 59, 0.4)';
+          dctx.lineWidth = 15;
+          dctx.globalCompositeOperation = 'multiply';
+        } else if (activeTool === 'eraser') {
+          dctx.lineWidth = 25;
+          dctx.globalCompositeOperation = 'destination-out';
+        }
+        dctx.lineCap = 'round';
+        dctx.lineJoin = 'round';
+      };
+
+      const move = (e) => {
+        if (!isDrawing) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        currentPath.push(pos);
+        dctx.lineTo(pos.x, pos.y);
+        dctx.stroke();
+      };
+
+      const end = () => {
+        if (!isDrawing) return;
+        isDrawing = false;
+        if (currentPath.length > 1) {
+          drawings.push({
+            type: 'path',
+            tool: activeTool,
+            points: currentPath,
+            color: dctx.strokeStyle,
+            width: dctx.lineWidth,
+            composite: dctx.globalCompositeOperation
+          });
+          sendMessage({ type: 'dirty' });
+        }
+        currentPath = [];
+      };
+
+      const click = (e) => {
+        if (activeTool !== 'text') return;
+        const pos = getPos(e);
+        const text = prompt('Enter annotation text:');
+        if (text && text.trim()) {
+          drawings.push({
+            type: 'text',
+            text: text.trim(),
+            x: pos.x,
+            y: pos.y,
+            color: '#2c3e50'
+          });
+          renderDrawings();
+          sendMessage({ type: 'dirty' });
+        }
+      };
+
+      drawingCanvas.addEventListener('mousedown', start);
+      drawingCanvas.addEventListener('mousemove', move);
+      drawingCanvas.addEventListener('mouseup', end);
+      drawingCanvas.addEventListener('touchstart', start, { passive: false });
+      drawingCanvas.addEventListener('touchmove', move, { passive: false });
+      drawingCanvas.addEventListener('touchend', end);
+      drawingCanvas.addEventListener('click', click);
+    }
+    setupDrawingListeners();
+
+    function renderDrawings() {
+      dctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+      drawings.forEach(d => {
+        if (d.type === 'path') {
+          dctx.beginPath();
+          dctx.globalCompositeOperation = d.composite || 'source-over';
+          dctx.strokeStyle = d.color;
+          dctx.lineWidth = d.width;
+          dctx.lineCap = 'round';
+          dctx.lineJoin = 'round';
+          d.points.forEach((p, i) => {
+            if (i === 0) dctx.moveTo(p.x, p.y);
+            else dctx.lineTo(p.x, p.y);
+          });
+          dctx.stroke();
+        } else if (d.type === 'text') {
+          dctx.globalCompositeOperation = 'source-over';
+          dctx.fillStyle = d.color || '#2c3e50';
+          dctx.font = 'bold 16px -apple-system, sans-serif';
+          dctx.fillText(d.text, d.x, d.y);
+        }
+      });
+    }
+
+    function createPin(position) {
+      const group = new THREE.Group();
+      
+      // Pin head
+      const head = new THREE.Mesh(
+        new THREE.SphereGeometry(0.08, 16, 16),
+        new THREE.MeshStandardMaterial({ color: 0xFF8C42 })
+      );
+      head.position.y = 0.2;
+      group.add(head);
+
+      // Pin needle
+      const needle = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.01, 0.01, 0.2, 8),
+        new THREE.MeshStandardMaterial({ color: 0xcccccc })
+      );
+      needle.position.y = 0.1;
+      group.add(needle);
+
+      group.position.copy(position);
+      scene.add(group);
+      return group;
+    }
+
+    function placePin(x, y) {
+      pointer.x = (x / window.innerWidth) * 2 - 1;
+      pointer.y = -(y / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      const intersects = raycaster.intersectObjects(meshes, true);
+      if (intersects.length > 0) {
+        const hit = intersects[0];
+        const pinId = 'pin-' + Date.now();
+        const pinObj = createPin(hit.point);
+        pins.push({ id: pinId, position: hit.point.clone() });
+        pinObjects.set(pinId, pinObj);
+        sendMessage({ type: 'pinPlaced', id: pinId, position: hit.point });
       }
     }
 
@@ -339,6 +517,11 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
     let meshes = [];
 
     renderer.domElement.addEventListener('pointerup', (e) => {
+      if (activeTool === 'pin') {
+        placePin(e.clientX, e.clientY);
+        return;
+      }
+      
       pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
       pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
@@ -348,6 +531,57 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
         sendMessage({ type: 'partClick', name: hit.name || hit.parent?.name || 'Unnamed' });
       }
     });
+
+    // ---- RN Communication ----
+    const redoStack = [];
+    function handleMessage(event) {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'setTool') {
+          activeTool = data.tool;
+          drawingCanvas.style.pointerEvents = (activeTool && activeTool !== 'pin') ? 'auto' : 'none';
+        } else if (data.type === 'undo') {
+          if (drawings.length > 0) {
+            redoStack.push({ type: 'drawing', item: drawings.pop() });
+            renderDrawings();
+          } else if (pins.length > 0) {
+            const lastPin = pins.pop();
+            const obj = pinObjects.get(lastPin.id);
+            if (obj) {
+              scene.remove(obj);
+              pinObjects.delete(lastPin.id);
+              redoStack.push({ type: 'pin', item: lastPin, obj: obj });
+            }
+          }
+        } else if (data.type === 'redo') {
+          if (redoStack.length === 0) return;
+          const last = redoStack.pop();
+          if (last.type === 'drawing') {
+            drawings.push(last.item);
+            renderDrawings();
+          } else if (last.type === 'pin') {
+            pins.push(last.item);
+            scene.add(last.obj);
+            pinObjects.set(last.item.id, last.obj);
+          }
+        } else if (data.type === 'clear') {
+          drawings.length = 0;
+          renderDrawings();
+          pins.forEach(pin => {
+            const obj = pinObjects.get(pin.id);
+            if (obj) scene.remove(obj);
+          });
+          pins.length = 0;
+          pinObjects.clear();
+          redoStack.length = 0;
+          sendMessage({ type: 'dirty' });
+        } else if (data.type === 'requestAnnotations') {
+          sendMessage({ type: 'annotationsData', data: { drawings, pins } });
+        }
+      } catch (e) {}
+    }
+    window.addEventListener('message', handleMessage);
+    document.addEventListener('message', handleMessage);
 
     // ---- Load Model ----
     async function loadModel() {

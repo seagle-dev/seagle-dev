@@ -29,6 +29,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../../constants/theme';
 import { getModelFileUrl } from '../../../services/api';
 import getModelViewerHtml from './modelViewerHtml';
+import FloatingAnnotationToolbar from './FloatingAnnotationToolbar';
+import SaveConfirmationModal from '../SaveConfirmationModal';
 
 const webViewProps = {
   allowFileAccess: true,
@@ -73,15 +75,9 @@ function useModelBase64({ model, onModelContextReady }) {
 
     async function readModelAsBase64() {
       try {
-        console.log('[ModelModal] Reading GLB as base64 from:', model.localFileUri);
-        console.log('[ModelModal] FileSystem available:', !!FileSystem);
-        console.log('[ModelModal] readAsStringAsync available:', !!FileSystem.readAsStringAsync);
-
         const base64 = await FileSystem.readAsStringAsync(model.localFileUri, {
           encoding: 'base64',
         });
-        console.log('[ModelModal] base64 read success, length:', base64.length);
-        console.log('[ModelModal] Base64 length:', base64.length, 'model:', model?.id);
         setModelBase64(base64);
         onModelContextReady?.({
           id: model.id,
@@ -110,34 +106,76 @@ const ModelModal = memo(function ModelModal({
   onModelContextReady,
   onClose,
   presentation = 'full',
+  activeTool: externalActiveTool,
+  onSelectTool: externalOnSelectTool,
 }) {
   const [selectedPart, setSelectedPart] = useState(null);
+  const webViewRef = useRef(null);
   const iframeRef = useRef(null);
   const isReaderPresentation = presentation === 'reader';
 
-  const modelUrl = model?.localFileUri || (model?.id ? getModelFileUrl(model.id) : null);
+  // Local state for when used outside ReadingTab, or synced from props
+  const [localActiveTool, setLocalActiveTool] = useState(null);
+  const activeTool = externalActiveTool !== undefined ? externalActiveTool : localActiveTool;
+  const onSelectTool = externalOnSelectTool || setLocalActiveTool;
+
+  const [isToolbarExpanded, setIsToolbarExpanded] = useState(false);
+  const [undoTrigger, setUndoTrigger] = useState(0);
+  const [clearTrigger, setClearTrigger] = useState(0);
+
+  // Save/Dirty State
+  const [isDirty, setIsDirty] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+
+  const postToViewer = useCallback((payload) => {
+    const msg = JSON.stringify(payload);
+    if (Platform.OS === 'web') {
+      iframeRef.current?.contentWindow?.postMessage(msg, '*');
+    } else {
+      webViewRef.current?.postMessage(msg);
+    }
+  }, []);
+
+  const handleCloseAttempt = useCallback(() => {
+    if (isDirty) {
+      setShowSaveModal(true);
+      return;
+    }
+    onClose();
+  }, [isDirty, onClose]);
+
+  const handleSaveAndExit = async () => {
+    setShowSaveModal(false);
+    postToViewer({ type: 'requestAnnotations' });
+  };
+
+  const handleDiscardAndExit = () => {
+    setShowSaveModal(false);
+    setIsDirty(false);
+    onClose();
+  };
+
+  useEffect(() => {
+    postToViewer({ type: 'setTool', tool: activeTool });
+  }, [activeTool, postToViewer]);
+
+  useEffect(() => {
+    if (undoTrigger > 0) postToViewer({ type: 'undo' });
+  }, [undoTrigger, postToViewer]);
+
+  useEffect(() => {
+    if (clearTrigger > 0) postToViewer({ type: 'clear' });
+  }, [clearTrigger, postToViewer]);
+
+  const modelUrl = useMemo(() => {
+    if (model?.localFileUri) return model.localFileUri;
+    if (model?.id) return getModelFileUrl(model.id);
+    return null;
+  }, [model]);
+
   const modelBase64 = useModelBase64({ model, onModelContextReady });
 
-  // Debug: confirm the viewer receives the saved orientation payload.
-  const viewState = model?.view_state ?? model?.viewState ?? null;
-
-  useEffect(() => {
-    if (visible) {
-      console.log('[ModelModal] visible:', visible);
-      console.log('[ModelModal] model:', model);
-      console.log('[ModelModal] modelUrl:', modelUrl);
-      console.log('[ModelModal] localFileUri exists?', !!model?.localFileUri);
-      console.log('[ModelModal] model id:', model?.id);
-      console.log('[ModelModal] viewState:', viewState);
-    }
-  }, [visible, model, modelUrl, viewState]);
-
-  // Safe logging for debugging
-  useEffect(() => {
-    if (visible && model) {
-      console.log(`[ModelModal] Opening model on ${Platform.OS}:`, model.id, model.name);
-    }
-  }, [visible, model]);
+  const viewState = useMemo(() => model?.view_state ?? null, [model]);
 
   const html = useMemo(() => {
     if (!modelUrl) return null;
@@ -152,60 +190,44 @@ const ModelModal = memo(function ModelModal({
 
       if (!data) return;
 
-      console.log('[ModelModal] Message received:', data.type);
       if (data.type === 'partClick') {
         setSelectedPart(data.name);
+      } else if (data.type === 'loaded') {
+        console.log('[ModelModal] WebView reported model loaded');
+      } else if (data.type === 'dirty') {
+        setIsDirty(true);
+      } else if (data.type === 'annotationsData') {
+        console.log('[ModelModal] Saving 3D annotations:', data.data);
+        // TODO: Persist 3D annotations
+        setIsDirty(false);
+        onClose();
       }
     } catch (err) {
-      console.warn('[ModelModal] Error parsing message:', err);
+      console.warn('[ModelModal] Message parse failed:', err.message);
     }
-  }, []);
-
-  // Listen for web messages
-  useEffect(() => {
-    if (Platform.OS === 'web' && visible) {
-      window.addEventListener('message', handleMessage);
-      return () => window.removeEventListener('message', handleMessage);
-    }
-  }, [handleMessage, visible]);
-
-  const handleClose = useCallback(() => {
-    setSelectedPart(null);
-    onClose?.();
   }, [onClose]);
+
+  if (!visible) return null;
 
   if (isReaderPresentation) {
     return (
-      <Modal
-        visible={visible}
-        animationType="fade"
-        presentationStyle="overFullScreen"
-        transparent
-        onRequestClose={handleClose}
-      >
-        <StatusBar barStyle="light-content" backgroundColor="rgba(17,26,80,0.28)" translucent />
-        <Pressable style={styles.readerBackdrop} onPress={handleClose}>
-          <Pressable style={styles.readerCard} onPress={(event) => event.stopPropagation()}>
-            <TouchableOpacity
-              onPress={handleClose}
-              style={styles.readerCloseBtn}
-              activeOpacity={0.75}
-              accessibilityLabel="Close model viewer"
-            >
-              <Ionicons name="close" size={18} color={COLORS.orange} />
+      <Modal transparent visible={visible} animationType="fade" onRequestClose={handleCloseAttempt}>
+        <Pressable style={styles.readerBackdrop} onPress={handleCloseAttempt}>
+          <View style={styles.readerCard} onStartShouldSetResponder={() => true}>
+            <View style={styles.readerScene}>
+              {html && <ModelViewerFrame html={html} iframeRef={iframeRef} onMessage={handleMessage} />}
+            </View>
+            <TouchableOpacity style={styles.readerCloseBtn} onPress={handleCloseAttempt}>
+              <Ionicons name="close" size={20} color={COLORS.white} />
             </TouchableOpacity>
-
-            {html ? (
-              <View style={styles.readerScene}>
-                <ModelViewerFrame html={html} iframeRef={iframeRef} onMessage={handleMessage} />
-              </View>
-            ) : (
-              <View style={[styles.readerScene, styles.emptyState]}>
-                <Text style={styles.emptyText}>No model available</Text>
-              </View>
-            )}
-          </Pressable>
+          </View>
         </Pressable>
+        <SaveConfirmationModal
+          visible={showSaveModal}
+          onSave={handleSaveAndExit}
+          onDiscard={handleDiscardAndExit}
+          onCancel={() => setShowSaveModal(false)}
+        />
       </Modal>
     );
   }
@@ -215,12 +237,11 @@ const ModelModal = memo(function ModelModal({
       visible={visible}
       animationType="slide"
       presentationStyle="fullScreen"
-      onRequestClose={handleClose}
+      onRequestClose={handleCloseAttempt}
     >
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
 
-        {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Text style={styles.title} numberOfLines={1}>
@@ -233,16 +254,14 @@ const ModelModal = memo(function ModelModal({
             )}
           </View>
           <TouchableOpacity
-            onPress={handleClose}
+            onPress={handleCloseAttempt}
             style={styles.closeBtn}
             activeOpacity={0.7}
-            accessibilityLabel="Close model viewer"
           >
             <Ionicons name="close" size={24} color={COLORS.white} />
           </TouchableOpacity>
         </View>
 
-        {/* 3D WebView / Iframe */}
         <View style={styles.sceneContainer}>
           {html ? (
             <ModelViewerFrame html={html} iframeRef={iframeRef} onMessage={handleMessage} />
@@ -251,9 +270,19 @@ const ModelModal = memo(function ModelModal({
               <Text style={styles.emptyText}>No model available</Text>
             </View>
           )}
+
+          <FloatingAnnotationToolbar
+            activeTool={activeTool}
+            expanded={isToolbarExpanded}
+            onToggleExpanded={() => setIsToolbarExpanded(!isToolbarExpanded)}
+            onSelectTool={(tool) => {
+              onSelectTool(activeTool === tool ? null : tool);
+            }}
+            onUndo={() => setUndoTrigger((prev) => prev + 1)}
+            onClear={() => setClearTrigger((prev) => prev + 1)}
+          />
         </View>
 
-        {/* Touch hint */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
             {Platform.OS === 'web'
@@ -262,11 +291,86 @@ const ModelModal = memo(function ModelModal({
           </Text>
         </View>
       </SafeAreaView>
+      <SaveConfirmationModal
+        visible={showSaveModal}
+        onSave={handleSaveAndExit}
+        onDiscard={handleDiscardAndExit}
+        onCancel={() => setShowSaveModal(false)}
+      />
     </Modal>
   );
 });
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+  },
+  header: {
+    height: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.lg,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  headerLeft: {
+    flex: 1,
+    marginRight: SPACING.md,
+  },
+  title: {
+    color: COLORS.white,
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+    fontFamily: FONTS.bold,
+  },
+  partInfo: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: FONT_SIZES.xs,
+    marginTop: 2,
+  },
+  partName: {
+    color: COLORS.orange,
+    fontWeight: '600',
+  },
+  closeBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sceneContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  webView: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: FONT_SIZES.sm,
+  },
+  footer: {
+    height: 40,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    paddingHorizontal: SPACING.lg,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: FONT_SIZES.xs,
+    fontFamily: FONTS.light,
+    textAlign: 'center',
+  },
   readerBackdrop: {
     flex: 1,
     justifyContent: 'center',
@@ -281,18 +385,6 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     overflow: 'hidden',
     backgroundColor: '#2f2f2f',
-    ...Platform.select({
-      ios: {
-        shadowColor: COLORS.black,
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.22,
-        shadowRadius: 24,
-      },
-      android: { elevation: 18 },
-      web: {
-        boxShadow: '0 18px 40px rgba(0,0,0,0.24)',
-      },
-    }),
   },
   readerScene: {
     flex: 1,
@@ -300,88 +392,15 @@ const styles = StyleSheet.create({
   },
   readerCloseBtn: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    zIndex: 10,
+    top: SPACING.md,
+    right: SPACING.md,
     width: 32,
     height: 32,
     borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(47,47,47,0.72)',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.navyDeep,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-  headerLeft: {
-    flex: 1,
-    marginRight: SPACING.md,
-  },
-  title: {
-    color: COLORS.white,
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '600',
-    fontFamily: FONTS.bold,
-  },
-  partInfo: {
-    color: '#6baaf7',
-    fontSize: FONT_SIZES.sm,
-    marginTop: 2,
-    fontFamily: FONTS.regular,
-  },
-  partName: {
-    fontWeight: '700',
-    fontFamily: FONTS.bold,
-  },
-  closeBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sceneContainer: {
-    flex: 1,
-    margin: SPACING.md,
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-    backgroundColor: '#e8e8e8',
-  },
-  webView: {
-    flex: 1,
-    backgroundColor: '#e8e8e8',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZES.md,
-    fontFamily: FONTS.regular,
-  },
-  footer: {
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    alignItems: 'center',
-  },
-  footerText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: FONT_SIZES.xs,
-    fontFamily: FONTS.light,
-    textAlign: 'center',
+    zIndex: 10,
   },
 });
 

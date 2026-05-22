@@ -43,7 +43,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 10px 0;
+      padding: 110px 0 15px 0;
       gap: 15px;
     }
     .page-container {
@@ -67,9 +67,27 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       width: 100%; height: 100%;
       pointer-events: none;
     }
+    .drawing-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .drawing-canvas.active {
+      pointer-events: auto;
+    }
+    .hotspot-wrapper {
+      position: absolute;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hotspot-wrapper * {
+      pointer-events: auto;
+    }
     .hotspot {
       position: absolute;
-      pointer-events: auto;
+      inset: 0;
       cursor: default;
       border: 0;
       border-radius: 4px;
@@ -155,42 +173,53 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       display: none;
     }
     .hotspot-open {
-      position: absolute;
-      top: 4px;
-      right: 4px;
-      z-index: 4;
+      height: 20px;
       border: none;
       border-radius: 4px;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(17, 26, 80, 0.85);
       color: #fff;
-      font-size: 10px;
-      padding: 4px 6px;
-      line-height: 1;
+      font-size: 11px;
+      padding: 0 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
       display: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
     }
-    .hotspot.is-3d-active .hotspot-open {
-      display: block;
+    .hotspot-wrapper.is-3d-active .hotspot-open {
+      display: flex;
+    }
+    .hotspot-controls {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-top: 4px;
+      z-index: 20;
+      pointer-events: auto;
     }
     .hotspot-toggle {
-      position: absolute;
-      top: 4px;
-      left: 4px;
-      z-index: 5;
-      min-width: 34px;
-      height: 24px;
-      border: 1px solid rgba(255,255,255,0.9);
-      border-radius: 12px;
-      background: rgba(17, 26, 80, 0.82);
-      color: #fff;
+      min-width: 32px;
+      height: 20px;
+      border: 1px solid rgba(17, 26, 80, 0.15);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.95);
+      color: #111A50;
       font-size: 10px;
       font-weight: 700;
-      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.22);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
-    .hotspot.is-3d-active .hotspot-toggle {
-      background: rgba(255, 140, 66, 0.92);
+    .hotspot-wrapper.is-3d-active .hotspot-toggle {
+      background: rgba(255, 140, 66, 0.95);
+      color: #fff;
+      border-color: rgba(255, 140, 66, 0.2);
     }
     .hotspot-fallback {
       position: absolute;
@@ -744,6 +773,8 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         
         // Render annotations if we have any for this page
         renderAnnotationsForPage(pageNum);
+        if (pageDrawings.has(pageNum)) renderDrawing(pageNum);
+        if (activeTool) getDrawingCanvas(pageNum);
       } catch (err) {
         console.error('Render failed for page', pageNum, err);
       } finally {
@@ -769,16 +800,22 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       layer.innerHTML = '';
       annotations.forEach(ann => {
         const viewerKey = getInlineViewerKey(ann);
+        const wrapper = document.createElement('div');
+        wrapper.className = 'hotspot-wrapper';
+        if (activeInlineViewerKeys.has(viewerKey)) {
+          wrapper.classList.add('is-3d-active');
+        }
+        wrapper.style.left = (ann.x * 100) + '%';
+        wrapper.style.top = (ann.y * 100) + '%';
+        wrapper.style.width = (ann.width * 100) + '%';
+        wrapper.style.height = (ann.height * 100) + '%';
+
         const div = document.createElement('div');
         div.className = 'hotspot';
         div.dataset.inlineViewerKey = viewerKey;
         if (activeInlineViewerKeys.has(viewerKey)) {
           div.classList.add('is-3d-active');
         }
-        div.style.left = (ann.x * 100) + '%';
-        div.style.top = (ann.y * 100) + '%';
-        div.style.width = (ann.width * 100) + '%';
-        div.style.height = (ann.height * 100) + '%';
 
         const viewerEl = document.createElement('div');
         viewerEl.className = 'hotspot-viewer';
@@ -792,7 +829,8 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         toggleButton.textContent = activeInlineViewerKeys.has(viewerKey) ? '2D' : '3D';
         toggleButton.onclick = (e) => {
           e.stopPropagation();
-          const enabled = !div.classList.contains('is-3d-active');
+          const enabled = !wrapper.classList.contains('is-3d-active');
+          wrapper.classList.toggle('is-3d-active', enabled);
           div.classList.toggle('is-3d-active', enabled);
           toggleButton.textContent = enabled ? '2D' : '3D';
           toggleButton.setAttribute('aria-label', enabled ? 'Show original image' : 'Show 3D model');
@@ -805,19 +843,17 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
             stopInlineModelViewer(viewerKey);
           }
         };
-        div.appendChild(toggleButton);
 
         // Visible only after the inline 3D preview is enabled.
         const openButton = document.createElement('button');
         openButton.type = 'button';
         openButton.className = 'hotspot-open';
         openButton.setAttribute('aria-label', 'Open model');
-        openButton.innerHTML = '<span style="display:block;width:24px;height:8px;background:#FF8C42;border:2px solid #fff;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,0.22);"></span>';
+        openButton.textContent = '⛶';
         openButton.onclick = (e) => {
           e.stopPropagation();
           sendMessage({ type: 'hotspotClick', annotation: ann });
         };
-        div.appendChild(openButton);
 
         if (ann.thumbnailUrl) {
           const thumb = document.createElement('img');
@@ -829,14 +865,400 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         const label = document.createElement('span');
         label.className = 'hotspot-label';
         label.textContent = ann.displayName || ann.label || '3D Model';
-        div.appendChild(label);
 
-        layer.appendChild(div);
+        const controls = document.createElement('div');
+        controls.className = 'hotspot-controls';
+        controls.appendChild(toggleButton);
+        controls.appendChild(openButton);
+
+        wrapper.appendChild(div);
+        wrapper.appendChild(controls);
+        wrapper.appendChild(label);
+        layer.appendChild(wrapper);
 
         if (activeInlineViewerKeys.has(viewerKey)) {
           try { initInlineModelViewer(viewerEl, ann); } catch (err) { console.error('initInlineModelViewer failed', err); }
         }
       });
+    }
+
+    // ---- Drawing State ----
+    let activeTool = null;
+    let isDrawing = false;
+    let draggingText = null;
+    let suppressNextTextClick = false;
+    let currentPath = [];
+    let drawingHistory = [];
+    let redoStack = [];
+    const pageDrawings = new Map(); // pageNum -> { items: [] }
+
+    function getDrawingCanvas(pageNum) {
+      const container = document.getElementById('page-' + pageNum);
+      if (!container) return null;
+      let canvas = container.querySelector('.drawing-canvas');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.className = 'drawing-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.zIndex = '50';
+        canvas.style.touchAction = 'none';
+        canvas.style.pointerEvents = activeTool ? 'auto' : 'none';
+        
+        const pdfCanvas = container.querySelector('.page-canvas');
+        if (pdfCanvas) {
+          canvas.width = pdfCanvas.width;
+          canvas.height = pdfCanvas.height;
+        }
+        
+        container.appendChild(canvas);
+        setupDrawingListeners(canvas, pageNum);
+      }
+      syncDrawingCanvasSize(canvas, pageNum);
+      return canvas;
+    }
+
+    function syncDrawingCanvasSize(canvas, pageNum) {
+      const container = document.getElementById('page-' + pageNum);
+      const pdfCanvas = container?.querySelector('.page-canvas');
+      if (!canvas || !pdfCanvas || !pdfCanvas.width || !pdfCanvas.height) return;
+
+      if (canvas.width !== pdfCanvas.width || canvas.height !== pdfCanvas.height) {
+        canvas.width = pdfCanvas.width;
+        canvas.height = pdfCanvas.height;
+        renderDrawing(pageNum);
+      }
+    }
+
+    function updateDrawingCanvasInteractivity() {
+      document.querySelectorAll('.drawing-canvas').forEach(c => {
+        c.style.pointerEvents = activeTool ? 'auto' : 'none';
+      });
+    }
+
+    function ensureDrawingCanvasesForActiveTool() {
+      if (!activeTool) {
+        updateDrawingCanvasInteractivity();
+        return;
+      }
+
+      document.querySelectorAll('.page-container').forEach(container => {
+        const pageNum = parseInt(container.dataset.page);
+        if (pageRenderState.get(pageNum)?.rendered) {
+          getDrawingCanvas(pageNum);
+        }
+      });
+      updateDrawingCanvasInteractivity();
+    }
+
+    function getTextSize(item) {
+      return item.size || 16;
+    }
+
+    function getTextFont(size = 16) {
+      return 'bold ' + size + 'px -apple-system, sans-serif';
+    }
+
+    function setupDrawingListeners(canvas, pageNum) {
+      const ctx = canvas.getContext('2d');
+      
+      const getPos = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches ? e.touches[0] : e;
+        return getPosFromClient(touch.clientX, touch.clientY);
+      };
+
+      const getPosFromClient = (clientX, clientY) => {
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x: (clientX - rect.left) * (canvas.width / rect.width),
+          y: (clientY - rect.top) * (canvas.height / rect.height),
+          relX: (clientX - rect.left) / rect.width,
+          relY: (clientY - rect.top) / rect.height
+        };
+      };
+
+      const getTouchDistance = (e) => {
+        if (!e.touches || e.touches.length < 2) return 0;
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+      };
+
+      const getTouchCenter = (e) => {
+        if (!e.touches || e.touches.length < 2) return getPos(e);
+        const clientX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const clientY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        return getPosFromClient(clientX, clientY);
+      };
+
+      const findTextAt = (pos) => {
+        const drawings = pageDrawings.get(pageNum);
+        if (!drawings?.items?.length) return null;
+
+        ctx.save();
+
+        for (let i = drawings.items.length - 1; i >= 0; i -= 1) {
+          const item = drawings.items[i];
+          if (item.type !== 'text') continue;
+
+          const size = getTextSize(item);
+          ctx.font = getTextFont(size);
+          const x = item.x * canvas.width;
+          const y = item.y * canvas.height;
+          const width = ctx.measureText(item.text).width;
+          const height = size * 1.4;
+          const padding = Math.max(8, size * 0.35);
+
+          if (
+            pos.x >= x - padding &&
+            pos.x <= x + width + padding &&
+            pos.y >= y - height &&
+            pos.y <= y + padding
+          ) {
+            ctx.restore();
+            return {
+              item,
+              offsetX: pos.relX - item.x,
+              offsetY: pos.relY - item.y,
+            };
+          }
+        }
+
+        ctx.restore();
+        return null;
+      };
+
+      const start = (e) => {
+        if (!activeTool) return;
+
+        if (activeTool === 'text') {
+          const pos = e.touches?.length >= 2 ? getTouchCenter(e) : getPos(e);
+          const textHit = findTextAt(pos);
+          if (!textHit) return;
+
+          e.preventDefault();
+          draggingText = {
+            ...textHit,
+            resize: e.touches?.length >= 2,
+            startDistance: getTouchDistance(e),
+            startSize: getTextSize(textHit.item),
+          };
+          suppressNextTextClick = true;
+          return;
+        }
+
+        e.preventDefault();
+        isDrawing = true;
+        const pos = getPos(e);
+        currentPath = [{ x: pos.relX, y: pos.relY }];
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+        
+        if (activeTool === 'pen') {
+          ctx.strokeStyle = '#2c3e50';
+          ctx.lineWidth = 3;
+          ctx.globalCompositeOperation = 'source-over';
+        } else if (activeTool === 'highlighter') {
+          ctx.strokeStyle = 'rgba(255, 193, 7, 0.16)';
+          ctx.lineWidth = 16;
+          ctx.globalCompositeOperation = 'source-over';
+        } else if (activeTool === 'eraser') {
+          ctx.lineWidth = 30;
+          ctx.globalCompositeOperation = 'destination-out';
+        }
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+      };
+
+      const move = (e) => {
+        if (draggingText) {
+          e.preventDefault();
+
+          if (draggingText.resize && e.touches?.length >= 2 && draggingText.startDistance > 0) {
+            const scale = getTouchDistance(e) / draggingText.startDistance;
+            draggingText.item.size = Math.max(10, Math.min(56, draggingText.startSize * scale));
+          } else {
+            const pos = getPos(e);
+            draggingText.item.x = Math.max(0, Math.min(1, pos.relX - draggingText.offsetX));
+            draggingText.item.y = Math.max(0, Math.min(1, pos.relY - draggingText.offsetY));
+          }
+
+          renderDrawing(pageNum);
+          return;
+        }
+
+        if (!isDrawing) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        currentPath.push({ x: pos.relX, y: pos.relY });
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+      };
+
+      const end = () => {
+        if (draggingText) {
+          draggingText = null;
+          sendMessage({ type: 'dirty' });
+          setTimeout(() => {
+            suppressNextTextClick = false;
+          }, 400);
+          return;
+        }
+
+        if (!isDrawing) return;
+        isDrawing = false;
+        if (currentPath.length > 1) {
+          saveDrawing(pageNum, {
+            type: 'path',
+            tool: activeTool,
+            points: currentPath,
+            color: ctx.strokeStyle,
+            width: ctx.lineWidth,
+            composite: ctx.globalCompositeOperation
+          });
+        }
+        currentPath = [];
+      };
+
+      const click = (e) => {
+        if (activeTool !== 'text') return;
+        if (suppressNextTextClick) {
+          suppressNextTextClick = false;
+          return;
+        }
+
+        const pos = getPos(e);
+        if (findTextAt(pos)) return;
+
+        const text = prompt('Enter annotation text:');
+        if (text && text.trim()) {
+          saveDrawing(pageNum, {
+            type: 'text',
+            text: text.trim(),
+            x: pos.relX,
+            y: pos.relY,
+            size: 16,
+            color: '#2c3e50'
+          });
+          renderDrawing(pageNum);
+        }
+      };
+
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', move);
+      canvas.addEventListener('mouseup', end);
+      canvas.addEventListener('mouseleave', end);
+      canvas.addEventListener('touchstart', start, { passive: false });
+      canvas.addEventListener('touchmove', move, { passive: false });
+      canvas.addEventListener('touchend', end);
+      canvas.addEventListener('touchcancel', end);
+      canvas.addEventListener('click', click);
+    }
+
+    function saveDrawing(pageNum, item) {
+      if (!pageDrawings.has(pageNum)) {
+        pageDrawings.set(pageNum, { items: [] });
+      }
+      pageDrawings.get(pageNum).items.push(item);
+      drawingHistory.push({ pageNum, item });
+      redoStack = [];
+      sendMessage({ type: 'annotationsChanged', pageNum, count: pageDrawings.get(pageNum).items.length });
+      sendMessage({ type: 'dirty' });
+    }
+
+    function renderDrawing(pageNum) {
+      const canvas = getDrawingCanvas(pageNum);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      const drawings = pageDrawings.get(pageNum);
+      if (!drawings) return;
+
+      drawings.items.forEach(item => {
+        if (item.type === 'path') {
+          ctx.beginPath();
+          ctx.globalCompositeOperation = item.composite || 'source-over';
+          ctx.strokeStyle = item.color;
+          ctx.lineWidth = item.width;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          
+          item.points.forEach((p, i) => {
+            const x = p.x * canvas.width;
+            const y = p.y * canvas.height;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.stroke();
+        } else if (item.type === 'text') {
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = item.color || '#2c3e50';
+          ctx.font = getTextFont(getTextSize(item));
+          ctx.fillText(item.text, item.x * canvas.width, item.y * canvas.height);
+        }
+      });
+    }
+
+    function undo() {
+      if (drawingHistory.length === 0) return;
+      const last = drawingHistory.pop();
+      redoStack.push(last);
+      const drawings = pageDrawings.get(last.pageNum);
+      if (drawings) {
+        drawings.items.pop();
+        renderDrawing(last.pageNum);
+        sendMessage({ type: 'dirty' });
+      }
+    }
+
+    function redo() {
+      if (redoStack.length === 0) return;
+      const item = redoStack.pop();
+      drawingHistory.push(item);
+      if (!pageDrawings.has(item.pageNum)) pageDrawings.set(item.pageNum, { items: [] });
+      pageDrawings.get(item.pageNum).items.push(item.item);
+      renderDrawing(item.pageNum);
+      sendMessage({ type: 'dirty' });
+    }
+
+    function clearPage(pageNum) {
+      if (pageDrawings.has(pageNum)) {
+        pageDrawings.get(pageNum).items = [];
+        renderDrawing(pageNum);
+        sendMessage({ type: 'dirty' });
+      }
+    }
+
+    function loadUserAnnotations(data) {
+      pageDrawings.clear();
+      drawingHistory = [];
+      redoStack = [];
+
+      Object.entries(data || {}).forEach(([pageKey, pageData]) => {
+        const pageNum = parseInt(pageKey, 10);
+        const items = Array.isArray(pageData) ? pageData : pageData?.items;
+        if (!pageNum || !Array.isArray(items)) return;
+
+        pageDrawings.set(pageNum, {
+          items: items.map((item) => ({ ...item })),
+        });
+        items.forEach((item) => {
+          drawingHistory.push({ pageNum, item });
+        });
+      });
+
+      document.querySelectorAll('.page-container').forEach(container => {
+        const pageNum = parseInt(container.dataset.page, 10);
+        if (pageRenderState.get(pageNum)?.rendered || container.querySelector('.drawing-canvas')) {
+          renderDrawing(pageNum);
+        }
+      });
+      ensureDrawingCanvasesForActiveTool();
     }
 
     // ---- Messages from RN ----
@@ -856,21 +1278,64 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
           // Refresh visible page's annotations if it's the one we just received
           const el = document.getElementById('page-' + pg);
           if (el && pageRenderState.get(pg)?.rendered) renderAnnotationsForPage(pg);
-          } else if (data.type === 'modelContextResponse') {
-            if (data.modelContext?.id != null) {
-              modelContextCache.set(String(data.modelContext.id), data.modelContext);
+        } else if (data.type === 'modelContextResponse') {
+          if (data.modelContext?.id != null) {
+            modelContextCache.set(String(data.modelContext.id), data.modelContext);
+          }
+          const waiter = modelContextWaiters.get(data.requestId);
+          if (waiter) {
+            modelContextWaiters.delete(data.requestId);
+            waiter(data.modelContext || null);
+          }
+        } else if (data.type === 'setUserAnnotations') {
+          loadUserAnnotations(data.data || {});
+        } else if (data.type === 'setTool') {
+          activeTool = data.tool;
+          ensureDrawingCanvasesForActiveTool();
+          sendMessage({ type: 'toolChanged', tool: activeTool });
+        } else if (data.type === 'undo') {
+          undo();
+        } else if (data.type === 'redo') {
+          redo();
+        } else if (data.type === 'clear') {
+          const visiblePage = lastReportedPage || 1;
+          clearPage(visiblePage);
+        } else if (data.type === 'requestAnnotations') {
+          const all = {};
+          pageDrawings.forEach((val, key) => {
+            if (val.items && val.items.length > 0) {
+              all[key] = val.items;
             }
-            const waiter = modelContextWaiters.get(data.requestId);
-            if (waiter) {
-              modelContextWaiters.delete(data.requestId);
-              waiter(data.modelContext || null);
-            }
+          });
+          sendMessage({ type: 'annotationsData', data: all });
         }
       } catch (e) { }
     }
 
     window.addEventListener('message', handleMessage);
     document.addEventListener('message', handleMessage);
+    sendMessage({ type: 'viewerReady' });
+
+    // ---- Scroll Tracking ----
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY;
+          sendMessage({
+            type: 'scroll',
+            scrollY: currentScrollY,
+            deltaY: currentScrollY - lastScrollY
+          });
+          lastScrollY = currentScrollY;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    }, { passive: true });
+
     loadPdf();
   </script>
 </body>
