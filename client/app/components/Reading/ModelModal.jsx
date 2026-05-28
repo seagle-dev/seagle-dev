@@ -44,7 +44,7 @@ const webViewProps = {
   bounces: false,
 };
 
-function ModelViewerFrame({ html, iframeRef, onMessage }) {
+function ModelViewerFrame({ html, iframeRef, webViewRef, onMessage }) {
   if (Platform.OS === 'web') {
     return (
       <iframe
@@ -58,6 +58,7 @@ function ModelViewerFrame({ html, iframeRef, onMessage }) {
 
   return (
     <WebView
+      ref={webViewRef}
       source={{ html }}
       style={styles.webView}
       onMessage={onMessage}
@@ -212,16 +213,28 @@ const ModelModal = memo(function ModelModal({
   if (isReaderPresentation) {
     return (
       <Modal transparent visible={visible} animationType="fade" onRequestClose={handleCloseAttempt}>
-        <Pressable style={styles.readerBackdrop} onPress={handleCloseAttempt}>
-          <View style={styles.readerCard} onStartShouldSetResponder={() => true}>
+        <View style={styles.readerBackdrop}>
+          <Pressable
+            style={styles.readerBackdropPressTarget}
+            pointerEvents="box-only"
+            onPress={handleCloseAttempt}
+          />
+          <View style={styles.readerCard}>
             <View style={styles.readerScene}>
-              {html && <ModelViewerFrame html={html} iframeRef={iframeRef} onMessage={handleMessage} />}
+              {html && (
+                <ModelViewerFrame
+                  html={html}
+                  iframeRef={iframeRef}
+                  webViewRef={webViewRef}
+                  onMessage={handleMessage}
+                />
+              )}
             </View>
             <TouchableOpacity style={styles.readerCloseBtn} onPress={handleCloseAttempt}>
               <Ionicons name="close" size={20} color={COLORS.white} />
             </TouchableOpacity>
           </View>
-        </Pressable>
+        </View>
         <SaveConfirmationModal
           visible={showSaveModal}
           onSave={handleSaveAndExit}
@@ -264,7 +277,12 @@ const ModelModal = memo(function ModelModal({
 
         <View style={styles.sceneContainer}>
           {html ? (
-            <ModelViewerFrame html={html} iframeRef={iframeRef} onMessage={handleMessage} />
+            <ModelViewerFrame
+              html={html}
+              iframeRef={iframeRef}
+              webViewRef={webViewRef}
+              onMessage={handleMessage}
+            />
           ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>No model available</Text>
@@ -378,6 +396,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xl,
     backgroundColor: 'rgba(255,255,255,0.58)',
   },
+  readerBackdropPressTarget: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+    elevation: 0,
+  },
   readerCard: {
     width: '100%',
     maxWidth: 360,
@@ -385,6 +408,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     overflow: 'hidden',
     backgroundColor: '#2f2f2f',
+    zIndex: 1,
+    elevation: 1,
   },
   readerScene: {
     flex: 1,
