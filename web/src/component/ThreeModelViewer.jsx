@@ -41,7 +41,6 @@ export default function ThreeModelViewer({ modelUrl, alt, compact, onPartClick, 
 
     // Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf0f0f0);
     sceneRef.current = scene;
 
     // Camera
@@ -49,7 +48,7 @@ export default function ThreeModelViewer({ modelUrl, alt, compact, onPartClick, 
     cameraRef.current = camera;
 
     // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -243,14 +242,19 @@ export default function ThreeModelViewer({ modelUrl, alt, compact, onPartClick, 
   }, [modelUrl, onPartClick, initialViewState, reportState]);
 
   return (
-    <div ref={mountRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div ref={mountRef} style={{ 
+      width: '100%', 
+      height: '100%', 
+      position: 'relative',
+      background: 'linear-gradient(to bottom, #444648 0%, #3B3D3F 50%, #2D2F31 100%)'
+    }}>
       {loading && (
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(240,240,240,0.9)', zIndex: 10,
+          background: 'transparent', zIndex: 10,
         }}>
-          <span style={{ fontSize: compact ? '12px' : '14px', color: '#888' }}>
+          <span style={{ fontSize: compact ? '12px' : '14px', color: '#F5F5F5' }}>
             Loading 3D model...
           </span>
         </div>
@@ -259,9 +263,9 @@ export default function ThreeModelViewer({ modelUrl, alt, compact, onPartClick, 
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(255,240,240,0.9)', zIndex: 10,
+          background: 'rgba(255,200,200,0.2)', zIndex: 10,
         }}>
-          <span style={{ fontSize: '12px', color: '#c00' }}>{error}</span>
+          <span style={{ fontSize: '12px', color: '#ffbaba' }}>{error}</span>
         </div>
       )}
     </div>

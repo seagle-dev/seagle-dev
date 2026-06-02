@@ -2,6 +2,7 @@ import React from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useRouter } from 'expo-router'
 import { login } from '../../services/api'
+import Logo from '../../assets/logo/Seagle_Logomark V1_02.svg'
 import {
   View,
   Text,
@@ -51,10 +52,10 @@ export default function Auth() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.container}>
-        <Image
-          source={require('../../assets/logo/Seagle_Logomark V1_01.svg')}
+        <Logo
+          width={140}
+          height={140}
           style={styles.logo}
-          resizeMode="contain"
         />
 
         <Text style={styles.title}>Log in to seagle</Text>
@@ -68,7 +69,7 @@ export default function Auth() {
             placeholderTextColor="#999999ce"
             keyboardType="email-address"
             autoCapitalize="none"
-            style={styles.input}
+            style={[styles.input, { color: COLORS.textPrimary }]}
             editable={!isLoading}
           />
         </View>
@@ -81,7 +82,7 @@ export default function Auth() {
             placeholder="*********"
             placeholderTextColor="#999999ce"
             secureTextEntry
-            style={styles.input}
+            style={[styles.input, { color: COLORS.textPrimary }]}
             editable={!isLoading}
           />
         </View>

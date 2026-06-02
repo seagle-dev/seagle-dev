@@ -98,13 +98,13 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       box-shadow: none;
     }
     .hotspot.is-3d-active {
-      background: #303030;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.14);
+      background: #3B3D3F;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
     .hotspot.is-3d-active:hover,
     .hotspot.is-3d-active:active {
       transform: translateY(-1px);
-      box-shadow: 0 5px 14px rgba(0,0,0,0.18);
+      box-shadow: 0 5px 14px rgba(0,0,0,0.4);
     }
     .hotspot-viewer {
       position: absolute;
@@ -133,7 +133,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       height: 100%;
       object-fit: cover;
       z-index: 1;
-      background: #303030;
+      background: #3B3D3F;
     }
     .hotspot-activate {
       position: absolute;
@@ -144,7 +144,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       border: none;
       border-radius: 6px;
       background: rgba(0, 0, 0, 0.72);
-      color: #fff;
+      color: #F5F5F5;
       font-size: 11px;
       font-weight: 600;
       padding: 6px 10px;
@@ -160,7 +160,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       align-items: center;
       gap: 4px;
       background: rgba(0, 0, 0, 0.7);
-      color: #fff;
+      color: #F5F5F5;
       padding: 3px 8px;
       border-radius: 4px;
       font-size: 11px;
@@ -176,8 +176,8 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       height: 20px;
       border: none;
       border-radius: 4px;
-      background: rgba(17, 26, 80, 0.85);
-      color: #fff;
+      background: rgba(59, 61, 63, 0.85);
+      color: #F5F5F5;
       font-size: 11px;
       padding: 0 8px;
       display: flex;
@@ -185,7 +185,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       justify-content: center;
       cursor: pointer;
       display: none;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
     .hotspot-wrapper.is-3d-active .hotspot-open {
       display: flex;
@@ -204,21 +204,21 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
     .hotspot-toggle {
       min-width: 32px;
       height: 20px;
-      border: 1px solid rgba(17, 26, 80, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 10px;
-      background: rgba(255, 255, 255, 0.95);
-      color: #111A50;
+      background: rgba(59, 61, 63, 0.95);
+      color: #F5F5F5;
       font-size: 10px;
       font-weight: 700;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
     .hotspot-wrapper.is-3d-active .hotspot-toggle {
       background: rgba(255, 140, 66, 0.95);
-      color: #fff;
+      color: #F5F5F5;
       border-color: rgba(255, 140, 66, 0.2);
     }
     .hotspot-fallback {
@@ -228,8 +228,8 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #d9d9d9;
-      color: #666;
+      background: #3B3D3F;
+      color: #F5F5F5;
       font-size: 11px;
       text-align: center;
       padding: 4px;
@@ -241,8 +241,8 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #e8e8e8;
-      color: #666;
+      background: #3B3D3F;
+      color: #F5F5F5;
       font-size: 11px;
       text-align: center;
       padding: 8px;
@@ -529,10 +529,10 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       const { THREE, OrbitControls, GLTFLoader } = runtime;
       const thumb = rootEl.querySelector('.hotspot-thumb');
       if (thumb) thumb.style.display = 'block';
-      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(rootEl.clientWidth, rootEl.clientHeight);
-      renderer.setClearColor(0xe8e8e8, 1);
+      // renderer.setClearColor(0xe8e8e8, 1);
       // ensure canvas fills container and is positioned correctly
       renderer.domElement.style.width = '100%';
       renderer.domElement.style.height = '100%';
@@ -544,7 +544,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       renderer.domElement.style.touchAction = 'none';
       rootEl.appendChild(renderer.domElement);
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xe8e8e8);
+      // scene.background = new THREE.Color(0xe8e8e8);
       const camera = new THREE.PerspectiveCamera(45, rootEl.clientWidth / rootEl.clientHeight, 0.01, 100);
       camera.position.set(0, 0, 4);
       const controls = new OrbitControls(camera, renderer.domElement);
@@ -1059,7 +1059,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         ctx.moveTo(pos.x, pos.y);
         
         if (activeTool === 'pen') {
-          ctx.strokeStyle = '#2c3e50';
+          ctx.strokeStyle = '#F5F5F5';
           ctx.lineWidth = 3;
           ctx.globalCompositeOperation = 'source-over';
         } else if (activeTool === 'highlighter') {
@@ -1142,7 +1142,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
             x: pos.relX,
             y: pos.relY,
             size: 16,
-            color: '#2c3e50'
+            color: '#F5F5F5'
           });
           renderDrawing(pageNum);
         }
@@ -1197,7 +1197,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
           ctx.stroke();
         } else if (item.type === 'text') {
           ctx.globalCompositeOperation = 'source-over';
-          ctx.fillStyle = item.color || '#2c3e50';
+          ctx.fillStyle = '#F5F5F5';
           ctx.font = getTextFont(getTextSize(item));
           ctx.fillText(item.text, item.x * canvas.width, item.y * canvas.height);
         }

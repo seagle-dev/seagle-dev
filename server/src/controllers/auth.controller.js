@@ -8,7 +8,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 
 exports.register = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, firstName, lastName } = req.body;
   console.log('Register called with email:', email);
   if (!email || !password) return res.status(400).json({ message: "Email and password required" });
 
@@ -31,15 +31,16 @@ exports.register = async (req, res) => {
 
     try {
       const [result] = await db.execute(
-        "INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)",
-        [email, hash, defaultRole]
+        "INSERT INTO users (email, password_hash, role, first_name, last_name) VALUES (?, ?, ?, ?, ?)",
+        [email, hash, defaultRole, firstName || '', lastName || '']
       );
       console.log('DB insert result:', result.insertId);
 
       const userId = result.insertId;
+      const userObj = { id: userId, email, firstName: firstName || '', lastName: lastName || '', role: defaultRole };
       const token = jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
 
-      return res.status(201).json({ token, user: { id: userId, email } });
+      return res.status(201).json({ token, user: userObj });
     } catch (dbErr) {
       console.error('DB error:', dbErr.code, dbErr.message);
       if (firebaseUser && firebaseUser.uid) {

@@ -29,15 +29,15 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <style>
     * { margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #f8f9fa; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #D1D5DB; }
     canvas { display: block; width: 100%; height: 100%; touch-action: none; }
     #loading {
       position: absolute; inset: 0;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      background: #f8f9fa;
+      background: transparent;
       font-family: -apple-system, sans-serif;
-      color: rgba(17, 26, 80, 0.7); font-size: 14px;
+      color: #2c3e50; font-size: 14px;
     }
     #debugInfo {
       position: absolute; bottom: 10px; left: 10px;
@@ -53,10 +53,12 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
       display: flex;
       align-items: center;
       transform: translateX(-50%);
-      background: #fff;
-      border: 1px solid rgba(17, 26, 80, 0.08);
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       border-radius: 6px;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
       overflow: hidden;
     }
     .tool-btn {
@@ -66,14 +68,14 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
       align-items: center;
       justify-content: center;
       border: 0;
-      border-right: 1px solid #d8deef;
-      background: #fff;
-      color: #111A50;
+      border-right: 1px solid rgba(0, 0, 0, 0.1);
+      background: transparent;
+      color: #2c3e50;
       appearance: none;
       -webkit-appearance: none;
     }
     .tool-btn:last-child { border-right: 0; }
-    .tool-btn:active { background: #f0f3fb; }
+    .tool-btn:active { background: rgba(0, 0, 0, 0.05); }
     .tool-btn svg {
       width: 18px;
       height: 18px;
@@ -115,9 +117,6 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
     </button>
     <button class="tool-btn" id="rotateBtn" title="Auto rotate" aria-label="Auto rotate">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-    </button>
-    <button class="tool-btn" id="panBtn" title="Pan with two fingers" aria-label="Pan with two fingers">
-      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M12 2v5"/><path d="M12 17v5"/><path d="M2 12h5"/><path d="M17 12h5"/></svg>
     </button>
   </div>
 
@@ -281,7 +280,7 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
           dctx.stroke();
         } else if (d.type === 'text') {
           dctx.globalCompositeOperation = 'source-over';
-          dctx.fillStyle = d.color || '#2c3e50';
+          dctx.fillStyle = '#2c3e50';
           dctx.font = 'bold 16px -apple-system, sans-serif';
           dctx.fillText(d.text, d.x, d.y);
         }
@@ -330,13 +329,12 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
     // ---- Scene Setup ----
     console.log('[modelViewerHtml] Setting up scene...');
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf8f9fa);
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 100);
     camera.position.set(0, 0, 4);
     console.log('[modelViewerHtml] Scene created, camera setup complete');
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -406,10 +404,6 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
     document.getElementById('zoomOutBtn').addEventListener('click', () => zoomBy(1.18));
     document.getElementById('rotateBtn').addEventListener('click', () => {
       controls.autoRotate = !controls.autoRotate;
-    });
-    document.getElementById('panBtn').addEventListener('click', () => {
-      renderer.domElement.style.cursor = 'grab';
-      setTimeout(() => { renderer.domElement.style.cursor = 'default'; }, 900);
     });
 
     function loadBlobWithXhr(url) {
@@ -666,7 +660,7 @@ export default function getModelViewerHtml(modelUrl, authToken, initialViewState
         console.error('[modelViewerHtml] loadModel caught error:', err.message);
         loadingEl.innerHTML = '<div style="color:#c0392b;text-align:center;">' +
           '<div style="font-size:28px;margin-bottom:8px;">⚠️</div>' +
-          'Failed to load model<br><span style="font-size:12px;color:#999;">' +
+          'Failed to load model<br><span style="font-size:12px;color:#F5F5F5;">' +
           err.message + '</span></div>';
         sendMessage({ type: 'error', message: err.message });
       }

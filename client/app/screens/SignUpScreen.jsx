@@ -43,7 +43,7 @@ export default function SignUpScreen() {
 
     setIsLoading(true)
     try {
-      const data = await register(email, password)
+      const data = await register(email, password, firstName, lastName)
       await signIn(data.user, data.token)
       setIsLoading(false)
       router.push('/screens/SuccessScreen')
@@ -73,7 +73,7 @@ export default function SignUpScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>First Name</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: COLORS.textPrimary }]}
                 placeholder="Enter First Name"
                 placeholderTextColor="#999"
                 value={firstName}
@@ -85,7 +85,7 @@ export default function SignUpScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Last Name</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: COLORS.textPrimary }]}
                 placeholder="Enter Last Name"
                 placeholderTextColor="#999"
                 value={lastName}
@@ -97,7 +97,7 @@ export default function SignUpScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: COLORS.textPrimary }]}
                 placeholder="Enter Email"
                 placeholderTextColor="#999"
                 value={email}
@@ -112,7 +112,7 @@ export default function SignUpScreen() {
               <Text style={styles.label}>Password</Text>
               <View style={styles.passwordContainer}>
                 <TextInput
-                  style={styles.passwordInput}
+                  style={[styles.passwordInput, { color: COLORS.textPrimary }]}
                   placeholder="************"
                   placeholderTextColor="#999"
                   value={password}
@@ -135,7 +135,7 @@ export default function SignUpScreen() {
               <Text style={styles.label}>Confirm Password</Text>
               <View style={styles.passwordContainer}>
                 <TextInput
-                  style={styles.passwordInput}
+                  style={[styles.passwordInput, { color: COLORS.textPrimary }]}
                   placeholder="************"
                   placeholderTextColor="#999"
                   value={confirmPassword}

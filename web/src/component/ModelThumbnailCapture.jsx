@@ -21,7 +21,7 @@ export default function ModelThumbnailCapture({ modelUrl, modelName, onCapture, 
     const size = 400;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf0f0f0);
+    scene.background = new THREE.Color(0x3B3D3F);
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(50, 1, 0.001, 1000);
@@ -30,6 +30,7 @@ export default function ModelThumbnailCapture({ modelUrl, modelName, onCapture, 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       preserveDrawingBuffer: true,
+      alpha: true,
     });
     renderer.setSize(size, size);
     renderer.setPixelRatio(1);
@@ -163,24 +164,25 @@ export default function ModelThumbnailCapture({ modelUrl, modelName, onCapture, 
       onClick={onCancel}
     >
       <div style={{
-        background: '#fff', borderRadius: '12px', padding: '20px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.3)', maxWidth: '460px', width: '100%',
+        background: '#3B3D3F', borderRadius: '12px', padding: '20px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.5)', maxWidth: '460px', width: '100%',
+        color: '#F5F5F5',
       }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 style={{ margin: '0 0 4px', fontSize: '16px', color: '#333' }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: '16px', color: '#F5F5F5' }}>
           📸 Capture Thumbnail
         </h3>
-        <p style={{ margin: '0 0 8px', fontSize: '12px', color: '#888' }}>
+        <p style={{ margin: '0 0 8px', fontSize: '12px', color: 'rgba(245, 245, 245, 0.7)' }}>
           Rotate the model to your preferred view, then click Capture.
         </p>
-        <p style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: '#555' }}>
+        <p style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: '#F5F5F5' }}>
           {modelName}
         </p>
 
         <div ref={mountRef} style={{
           width: 400, height: 400, borderRadius: '8px', overflow: 'hidden',
-          border: '1px solid #e0e0e0', background: '#f0f0f0', marginBottom: '12px',
+          border: '1px solid rgba(255, 255, 255, 0.1)', background: 'linear-gradient(to bottom, #444648 0%, #3B3D3F 50%, #2D2F31 100%)', marginBottom: '12px',
         }} />
 
         <div style={{ display: 'flex', gap: '8px' }}>

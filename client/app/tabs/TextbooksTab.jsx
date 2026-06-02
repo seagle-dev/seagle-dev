@@ -74,6 +74,19 @@ export default function TextbooksTab({ search = '', category = null }) {
     });
   }, [router]);
 
+  const handleReadNow = useCallback((book) => {
+    router.push({
+      pathname: '/tabs/Reader',
+      params: {
+        book: JSON.stringify({
+          id: book.id,
+          title: book.title,
+          pdfUrl: book.pdfUrl,
+        }),
+      },
+    });
+  }, [router]);
+
   const renderBookItem = useCallback(({ item }) => (
     <TouchableOpacity style={styles.bookCard} onPress={() => handleBookPress(item)} activeOpacity={0.9}>
       <View style={styles.imageContainer}>
@@ -95,7 +108,7 @@ export default function TextbooksTab({ search = '', category = null }) {
         </View>
 
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.readButton} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.readButton} activeOpacity={0.8} onPress={() => handleReadNow(item)}>
             <Ionicons name="book" size={14} color={COLORS.navy} />
             <Text style={styles.readButtonText}>Read Now</Text>
           </TouchableOpacity>
@@ -105,7 +118,7 @@ export default function TextbooksTab({ search = '', category = null }) {
         </View>
       </View>
     </TouchableOpacity>
-  ), [handleBookPress]);
+  ), [handleBookPress, handleReadNow]);
 
   const renderSeparator = () => <View style={{ height: SPACING.md }} />;
 

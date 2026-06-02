@@ -6,6 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
 import { PLACEHOLDER_AVATAR } from '../../constants/placeholders';
+import ProfileAvatar from './ProfileAvatar';
+import HeaderLogo from '../../assets/logo/Seagle_Logomark V1_03.svg';
 
 const TopHeader = ({
   showBackButton = false,
@@ -20,7 +22,7 @@ const TopHeader = ({
   showCart = false,
 }) => {
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -28,7 +30,7 @@ const TopHeader = ({
   const notificationCount = 3;
   const hasTitle = Boolean(title);
   const showHeaderCart = false; // Disabled per request
-  const showHeaderNotifications = showNotifications && !showBackButton;
+  const showHeaderNotifications = false; // showNotifications && !showBackButton; // Disabled for now
   const showHeaderProfile = showProfile && !showBackButton;
 
   const handleBackPress = useCallback(() => {
@@ -60,7 +62,7 @@ const TopHeader = ({
             </TouchableOpacity>
           ) : (
             <View style={styles.logoContainer}>
-              <Image source={require('../../assets/logo/Seagle_Logomark V1_03.svg')} style={styles.logo} resizeMode="contain" />
+              <HeaderLogo width={160} height={56} style={styles.logo} />
             </View>
           )}
         </View>
@@ -103,9 +105,7 @@ const TopHeader = ({
               )}
 
               {showHeaderProfile && (
-                <TouchableOpacity onPress={() => setShowProfileMenu(true)} activeOpacity={0.7}>
-                  <Image source={{ uri: PLACEHOLDER_AVATAR }} style={styles.profileImage} />
-                </TouchableOpacity>
+                <ProfileAvatar user={user} size={38} onPress={() => setShowProfileMenu(true)} />
               )}
             </>
           )}

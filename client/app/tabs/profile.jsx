@@ -7,6 +7,7 @@ import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS, SHADOWS } from '../../const
 import CacheDebugPanel from '../components/CacheDebugPanel';
 import { PLACEHOLDER_PROFILE_IMAGE } from '../../constants/placeholders';
 import { useRouter } from 'expo-router';
+import ProfileAvatar from '../components/ProfileAvatar';
 
 export default function ProfileScreen() {
   const { user: authUser, signOut } = useAuth();
@@ -167,9 +168,10 @@ export default function ProfileScreen() {
         {/* Profile Header */}
         <View style={styles.header}>
           <View style={styles.profileImageContainer}>
-            <Image
-              source={{ uri: user.profileImage || PLACEHOLDER_PROFILE_IMAGE }}
-              style={styles.profileImage}
+            <ProfileAvatar 
+              user={user} 
+              size={100} 
+              disabled={true} 
             />
             <TouchableOpacity style={styles.cameraButton}>
               <Ionicons name="camera" size={18} color={COLORS.white} />

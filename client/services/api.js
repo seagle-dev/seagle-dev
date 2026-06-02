@@ -99,8 +99,8 @@ export async function login(email, password) {
   return { token, user };
 }
 
-export async function register(email, password) {
-  const res = await api.post('/auth/register', { email, password });
+export async function register(email, password, firstName, lastName) {
+  const res = await api.post('/auth/register', { email, password, firstName, lastName });
   const { token, user } = res.data;
   await setToken(token);
   await AsyncStorage.setItem('user', JSON.stringify(user));

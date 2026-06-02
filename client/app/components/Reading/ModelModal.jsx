@@ -337,18 +337,18 @@ const styles = StyleSheet.create({
     marginRight: SPACING.md,
   },
   title: {
-    color: COLORS.white,
+    color: '#F5F5F5',
     fontSize: FONT_SIZES.md,
     fontWeight: '700',
     fontFamily: FONTS.bold,
   },
   partInfo: {
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(245, 245, 245, 0.7)',
     fontSize: FONT_SIZES.xs,
     marginTop: 2,
   },
   partName: {
-    color: COLORS.orange,
+    color: '#FF8C42',
     fontWeight: '600',
   },
   closeBtn: {
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(245, 245, 245, 0.5)',
     fontSize: FONT_SIZES.sm,
   },
   footer: {
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   footerText: {
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(245, 245, 245, 0.6)',
     fontSize: FONT_SIZES.xs,
     fontFamily: FONTS.light,
     textAlign: 'center',

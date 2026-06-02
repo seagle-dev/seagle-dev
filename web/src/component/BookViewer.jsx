@@ -68,25 +68,25 @@ const InlineModelOverlay = React.memo(function InlineModelOverlay({ mapping, mod
         height: `${mapping.height * 100}%`,
         zIndex: 20,
         borderRadius: '4px',
-        overflow: 'visible', // Changed from hidden to allow buttons below
-        border: '1px solid rgba(0,0,0,0.12)',
-        boxShadow: '0 1px 6px rgba(0,0,0,0.1)',
-        background: is3D ? '#f0f0f0' : 'transparent',
+        overflow: 'visible',
+        border: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        background: is3D ? '#3B3D3F' : 'transparent',
       }}>
         {/* Header (Inside) */}
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: 'linear-gradient(to bottom, rgba(255,255,255,0.92), rgba(255,255,255,0.75))',
+          background: 'linear-gradient(to bottom, #444648, #3B3D3F)',
           backdropFilter: 'blur(4px)',
           padding: '2px 6px',
           zIndex: 30,
-          borderBottom: '1px solid rgba(0,0,0,0.06)',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
           borderTopLeftRadius: '4px',
           borderTopRightRadius: '4px',
         }}>
           <span style={{
-            color: '#333', fontSize: '10px', fontWeight: '600',
+            color: '#F5F5F5', fontSize: '10px', fontWeight: '600',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '85%',
           }}>
             {model.name || mapping.label || '3D Model'}
@@ -105,11 +105,11 @@ const InlineModelOverlay = React.memo(function InlineModelOverlay({ mapping, mod
               onViewStateChange={handleViewStateChange}
             />
           ) : (
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.1)' }}>
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.1)' }}>
               {model.thumbnail ? (
                 <img src={model.thumbnail} alt={model.name} style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: 0.8 }} />
               ) : (
-                <div style={{ color: '#aaa', fontSize: '10px', fontStyle: 'italic' }}>2D Mode</div>
+                <div style={{ color: '#F5F5F5', fontSize: '10px', fontStyle: 'italic', opacity: 0.6 }}>2D Mode</div>
               )}
             </div>
           )}
@@ -176,19 +176,19 @@ const InlineModelOverlay = React.memo(function InlineModelOverlay({ mapping, mod
             padding: '12px 20px', display: 'flex', justifyContent: 'space-between',
             alignItems: 'center', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.1)',
           }}>
-            <h2 style={{ margin: 0, color: '#fff', fontSize: '18px', fontWeight: '500' }}>
+            <h2 style={{ margin: 0, color: '#F5F5F5', fontSize: '18px', fontWeight: '500' }}>
               {model.name || mapping.label || '3D Model'}
             </h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               {selectedBone && (
-                <span style={{ color: '#4a90d9', fontSize: '13px' }}>
-                  Selected: <b>{selectedBone.name}</b>
+                <span style={{ color: '#F5F5F5', fontSize: '13px', opacity: 0.9 }}>
+                  Selected: <b style={{ color: '#FF8C42' }}>{selectedBone.name}</b>
                 </span>
               )}
               <button
                 onClick={() => setExpanded(false)}
                 style={{
-                  background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none',
+                  background: 'rgba(255,255,255,0.15)', color: '#F5F5F5', border: 'none',
                   borderRadius: '50%', width: '32px', height: '32px', fontSize: '16px',
                   cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
@@ -199,7 +199,7 @@ const InlineModelOverlay = React.memo(function InlineModelOverlay({ mapping, mod
           <div
             style={{
               flex: 1, margin: '12px 20px 20px', borderRadius: '8px',
-              overflow: 'hidden', background: '#f0f0f0',
+              overflow: 'hidden', background: 'linear-gradient(to bottom, #444648 0%, #3B3D3F 50%, #2D2F31 100%)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -337,8 +337,8 @@ export default function BookViewer({ book }) {
         padding: showHeader ? '10px 24px' : '0 24px',
         height: showHeader ? 'auto' : '0',
         overflow: 'hidden',
-        background: '#2c3e50',
-        borderBottom: showHeader ? '2px solid #34495e' : 'none',
+        background: '#3B3D3F',
+        borderBottom: showHeader ? '2px solid rgba(255,255,255,0.1)' : 'none',
         flexShrink: 0,
         display: 'flex',
         alignItems: 'center',
@@ -347,12 +347,12 @@ export default function BookViewer({ book }) {
         zIndex: 100,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <h2 style={{ margin: 0, color: '#fff', fontSize: '18px', fontWeight: '500' }}>
+          <h2 style={{ margin: 0, color: '#F5F5F5', fontSize: '18px', fontWeight: '500' }}>
             {book?.title || 'Book Viewer'}
           </h2>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '20px', borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
-            <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px', fontWeight: '500' }}>3D VIEWS</span>
+            <span style={{ color: 'rgba(245,245,245,0.8)', fontSize: '12px', fontWeight: '500' }}>3D VIEWS</span>
             <label style={{
               position: 'relative',
               display: 'inline-block',
@@ -369,7 +369,7 @@ export default function BookViewer({ book }) {
               <span style={{
                 position: 'absolute',
                 top: 0, left: 0, right: 0, bottom: 0,
-                backgroundColor: show3DDiagrams ? '#2ecc71' : '#95a5a6',
+                backgroundColor: show3DDiagrams ? '#FF8C42' : '#95a5a6',
                 transition: '0.3s',
                 borderRadius: '20px'
               }}>
@@ -395,9 +395,9 @@ export default function BookViewer({ book }) {
           <input type="number" value={pageNumber}
             onChange={(e) => { const v = Number(e.target.value); if (v >= 1 && v <= (numPages || 1)) goToPage(v); }}
             min={1} max={numPages || 1}
-            style={{ width: '50px', padding: '6px', fontSize: '13px', textAlign: 'center', borderRadius: '4px', border: '1px solid #ccc' }}
+            style={{ width: '50px', padding: '6px', fontSize: '13px', textAlign: 'center', borderRadius: '4px', border: '1px solid #ccc', background: 'transparent', color: '#F5F5F5' }}
           />
-          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>of {numPages || '?'}</span>
+          <span style={{ color: 'rgba(245,245,245,0.7)', fontSize: '13px' }}>of {numPages || '?'}</span>
           <button onClick={() => goToPage(pageNumber + 1)} disabled={pageNumber >= numPages}
             style={{ ...navBtnStyle, opacity: pageNumber >= numPages ? 0.4 : 1, cursor: pageNumber >= numPages ? 'not-allowed' : 'pointer' }}>
             Next →
@@ -408,7 +408,7 @@ export default function BookViewer({ book }) {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
         {/* Main Viewer with Scroll Event */}
         <div 
-          style={{ flex: 1, overflow: 'auto', background: '#e8e8e8' }}
+          style={{ flex: 1, overflow: 'auto', background: '#2D2F31' }}
           onScroll={handleScroll}
         >
           {pdfUrl ? (
@@ -424,27 +424,27 @@ export default function BookViewer({ book }) {
               />
             </Worker>
           ) : (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#888' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#F5F5F5' }}>
               Loading PDF...
             </div>
           )}
         </div>
 
         <div style={{
-          width: '280px', background: '#fff', borderLeft: '1px solid #e0e0e0',
+          width: '280px', background: '#3B3D3F', borderLeft: '1px solid rgba(255,255,255,0.1)',
           overflowY: 'auto', padding: '16px', flexShrink: 0,
         }}>
-          <h3 style={{ marginTop: 0, fontSize: '15px', color: '#2c3e50', fontWeight: '600' }}>
+          <h3 style={{ marginTop: 0, fontSize: '15px', color: '#F5F5F5', fontWeight: '600' }}>
             3D Models on Page {pageNumber}
           </h3>
-          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '12px' }}>
+          <div style={{ fontSize: '11px', color: 'rgba(245,245,245,0.5)', marginBottom: '12px' }}>
             {pageMappings.length} annotation{pageMappings.length !== 1 ? 's' : ''}
           </div>
 
           {pageMappings.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '24px 0' }}>
               <div style={{ fontSize: '28px', marginBottom: '8px', opacity: 0.3 }}>📄</div>
-              <p style={{ color: '#aaa', fontSize: '12px', fontStyle: 'italic' }}>No 3D models on this page</p>
+              <p style={{ color: 'rgba(245,245,245,0.4)', fontSize: '12px', fontStyle: 'italic' }}>No 3D models on this page</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -452,17 +452,17 @@ export default function BookViewer({ book }) {
                 const model = modelMap.get(m.model_id);
                 return (
                   <div key={m.id} style={{
-                    padding: '10px', border: '1px solid #e8e8e8', borderRadius: '6px',
-                    background: '#fafafa', transition: 'all 0.2s',
+                    padding: '10px', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px',
+                    background: 'rgba(255,255,255,0.03)', transition: 'all 0.2s',
                   }}>
                     {model?.thumbnail && (
                       <img src={model.thumbnail} alt={model.name}
                         style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '4px', marginBottom: '6px' }} />
                     )}
-                    <div style={{ fontWeight: '600', marginBottom: '2px', fontSize: '13px', color: '#333' }}>
+                    <div style={{ fontWeight: '600', marginBottom: '2px', fontSize: '13px', color: '#F5F5F5' }}>
                       {model?.name || m.label || `Model ${m.model_id}`}
                     </div>
-                    <div style={{ fontSize: '10px', color: '#999' }}>
+                    <div style={{ fontSize: '10px', color: 'rgba(245,245,245,0.5)' }}>
                       Position: ({(m.x * 100).toFixed(0)}%, {(m.y * 100).toFixed(0)}%) •
                       Size: {(m.width * 100).toFixed(0)}%×{(m.height * 100).toFixed(0)}%
                     </div>
