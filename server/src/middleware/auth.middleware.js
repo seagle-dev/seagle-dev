@@ -15,7 +15,7 @@ async function verifyToken(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET);
     const userId = decoded.id;
 
-    const [rows] = await db.execute('SELECT id, email FROM users WHERE id = ?', [userId]);
+    const { rows } = await db.query('SELECT id, email FROM users WHERE id = $1', [userId]);
     if (!rows || rows.length === 0) return res.status(401).json({ message: "User not found" });
     req.user = { id: rows[0].id, email: rows[0].email };
     next();

@@ -7,7 +7,7 @@ async function verifyAdmin(req, res, next) {
       console.warn('verifyAdmin unauthorized: no req.user');
       return res.status(401).json({ message: 'Unauthorized' });
     }
-    const [rows] = await db.execute('SELECT role FROM users WHERE id = ?', [req.user.id]);
+    const { rows } = await db.query('SELECT role FROM users WHERE id = $1', [req.user.id]);
     console.log('verifyAdmin DB role rows length=', rows?.length || 0);
     if (!rows || rows.length === 0) {
       console.warn('verifyAdmin user not found', { id: req.user.id });

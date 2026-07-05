@@ -5,11 +5,11 @@ async function getRecentlyRead(userId) {
     SELECT b.id, b.title, b.cover_image, b.pdf_url, b.description, b.category, uba.last_read_at
     FROM user_book_activity uba
     JOIN books b ON uba.book_id = b.id
-    WHERE uba.user_id = ?
+    WHERE uba.user_id = $1
     ORDER BY uba.last_read_at DESC
     LIMIT 5
   `;
-  const [rows] = await db.execute(sql, [userId]);
+  const { rows } = await db.query(sql, [userId]);
   return rows.map(r => ({
     id: r.id,
     title: r.title,
@@ -30,7 +30,7 @@ async function getTrending() {
     ORDER BY read_count DESC
     LIMIT 5
   `;
-  const [rows] = await db.execute(sql);
+  const { rows } = await db.query(sql);
   return rows.map(r => ({
     id: r.id,
     title: r.title,

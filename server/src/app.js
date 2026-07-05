@@ -78,7 +78,7 @@ app.get('/api/health', (req, res) => {
 app.get('/localhost', async (req, res) => {
   const db = require('./config/db');
   try {
-    const [rows] = await db.query('SELECT 1 + 1 AS result');
+    const { rows } = await db.query('SELECT 1 + 1 AS result');
     res.json({ message: "Connected!", data: rows });
   } catch (err) {
     console.error('Database connection error:', err);

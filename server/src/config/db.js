@@ -1,13 +1,23 @@
-const mysql = require("mysql2");
+const { Pool } = require('pg');
 
-const pool = mysql.createPool({
-  host: process.env.MYSQLHOST || process.env.MYSQL_HOST,
-  user: process.env.MYSQLUSER || process.env.MYSQL_USER,
-  password: process.env.MYSQLPASSWORD || process.env.MYSQL_PASSWORD,
-  database: process.env.MYSQLDATABASE || process.env.MYSQL_DATABASE,
-  port: process.env.MYSQLPORT || process.env.MYSQL_PORT || 3306,
-  waitForConnections: true,
-  connectionLimit: 10
-});
+const config = {};
 
-module.exports = pool.promise();
+if (process.env.DATABASE_URL) {
+  config.connectionString = process.env.DATABASE_URL;
+} else {
+  config.host = process.env.PGHOST || process.env.PG_HOST || 'localhost';
+  config.user = process.env.PGUSER || process.env.PG_USER || 'postgres';
+  config.password = process.env.PGPASSWORD || process.env.PG_PASSWORD;
+  config.database = process.env.PGDATABASE || process.env.PG_DATABASE || 'postgres';
+  config.port = process.env.PGPORT || process.env.PG_PORT || 5432;
+}
+
+if (config.connectionString || (config.host && config.host !== 'localhost' && config.host !== '127.0.0.1')) {
+  config.ssl = {
+    rejectUnauthorized: false
+  };
+}
+
+const pool = new Pool(config);
+
+module.exports = pool;
