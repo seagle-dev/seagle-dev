@@ -11,18 +11,18 @@ async function listBooks({ search, category, page = 1, limit = 10, sort = 'newes
   const params = [];
 
   if (search) {
-    where.push('b.title LIKE ?');
     params.push(`%${search}%`);
+    where.push(`b.title LIKE $${params.length}`);
   }
   if (category) {
-    where.push('b.category = ?');
     params.push(category);
+    where.push(`b.category = $${params.length}`);
   }
 
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
   const countSql = `SELECT COUNT(DISTINCT b.id) AS total FROM books b ${whereSql}`;
-  const [countRows] = await db.execute(countSql, params);
+  const { rows: countRows } = await db.query(countSql, params);
   const totalItems = Number(countRows[0]?.total || 0);
 
   let selectSql;
@@ -52,7 +52,7 @@ async function listBooks({ search, category, page = 1, limit = 10, sort = 'newes
   }
 
   const selectParams = params.slice(); // only bound params for WHERE clause
-  const [rows] = await db.execute(selectSql, selectParams);
+  const { rows } = await db.query(selectSql, selectParams);
 
   const data = rows.map(r => ({
     id: r.id,
@@ -78,18 +78,18 @@ async function listModels({ search, category, page = 1, limit = 10 }) {
   const params = [];
 
   if (search) {
-    where.push('m.name LIKE ?');
     params.push(`%${search}%`);
+    where.push(`m.name LIKE $${params.length}`);
   }
   if (category) {
-    where.push('m.category = ?');
     params.push(category);
+    where.push(`m.category = $${params.length}`);
   }
 
   const whereSql = `WHERE ${where.join(' AND ')}`;
 
   const countSql = `SELECT COUNT(*) AS total FROM models_3d m ${whereSql}`;
-  const [countRows] = await db.execute(countSql, params);
+  const { rows: countRows } = await db.query(countSql, params);
   const totalItems = Number(countRows[0]?.total || 0);
 
   const selectSql = `
@@ -101,7 +101,7 @@ async function listModels({ search, category, page = 1, limit = 10 }) {
   `;
   const execParams = params.slice();
 
-  const [rows] = await db.execute(selectSql, execParams);
+  const { rows } = await db.query(selectSql, execParams);
 
   const data = rows.map(r => ({
     id: r.id,
@@ -139,10 +139,10 @@ async function getMappings(bookId, pageNumber) {
       md.view_state AS model_view_state
     FROM mappings m
     LEFT JOIN models_3d md ON md.id = m.model_id
-    WHERE m.book_id = ? AND m.page_number = ?
+    WHERE m.book_id = $1 AND m.page_number = $2
     ORDER BY m.id
   `;
-  const [rows] = await db.execute(sql, [bookId, pageNumber]);
+  const { rows } = await db.query(sql, [bookId, pageNumber]);
 
   return rows.map((row) => ({
     ...row,
@@ -172,10 +172,10 @@ async function getBookMappings(bookId) {
       md.view_state AS model_view_state
     FROM mappings m
     LEFT JOIN models_3d md ON md.id = m.model_id
-    WHERE m.book_id = ?
+    WHERE m.book_id = $1
     ORDER BY m.page_number, m.id
   `;
-  const [rows] = await db.execute(sql, [bookId]);
+  const { rows } = await db.query(sql, [bookId]);
 
   return rows.map((row) => ({
     ...row,
