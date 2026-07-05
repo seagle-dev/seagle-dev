@@ -10,7 +10,7 @@ async function listBooks() {
   console.log('listBooks called');
   try {
     const sql = `SELECT id, title, description, cover_image, pdf_url, category, created_at FROM books WHERE pdf_url IS NOT NULL ORDER BY created_at DESC`;
-    const [rows] = await db.execute(sql);
+    const { rows } = await db.query(sql);
     console.log('listBooks result:', rows?.length || 0, 'rows');
     return rows || [];
   } catch (err) {
@@ -21,9 +21,9 @@ async function listBooks() {
 
 async function getBookPdfPath(id) {
   if (!id) return null;
-  const sql = `SELECT pdf_url FROM books WHERE id = ? LIMIT 1`;
+  const sql = `SELECT pdf_url FROM books WHERE id = $1 LIMIT 1`;
   try {
-    const [rows] = await db.execute(sql, [id]);
+    const { rows } = await db.query(sql, [id]);
     return rows && rows[0] ? rows[0].pdf_url : null;
   } catch (err) {
     console.error('admin.service.getBookPdfPath error', err.message);
@@ -33,9 +33,9 @@ async function getBookPdfPath(id) {
 
 async function getBookCoverPath(id) {
   if (!id) return null;
-  const sql = `SELECT cover_image FROM books WHERE id = ? LIMIT 1`;
+  const sql = `SELECT cover_image FROM books WHERE id = $1 LIMIT 1`;
   try {
-    const [rows] = await db.execute(sql, [id]);
+    const { rows } = await db.query(sql, [id]);
     return rows && rows[0] ? rows[0].cover_image : null;
   } catch (err) {
     console.error('admin.service.getBookCoverPath error', err.message);
@@ -95,7 +95,7 @@ async function createBook({ title, description, category, pdfFile, uploadedBy })
 
   // 3. Insert into DB
   console.log('[createBook] 🔄 Step 3 - Inserting into DB, coverPath:', coverPath);
-  const sql = `INSERT INTO books (title, description, cover_image, pdf_url, category, uploaded_by) VALUES (?, ?, ?, ?, ?, ?)`;
+  const sql = `INSERT INTO books (title, description, cover_image, pdf_url, category, uploaded_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`;
   const params = [
     title || 'Untitled',
     description || null,
@@ -104,11 +104,12 @@ async function createBook({ title, description, category, pdfFile, uploadedBy })
     category || null,
     uploadedBy || null
   ];
-  const [result] = await db.execute(sql, params);
-  console.log('[createBook] ✅ Step 3 DONE - Book ID:', result.insertId, '| coverPath in DB:', coverPath);
+  const { rows: insertRows } = await db.query(sql, params);
+  const insertId = insertRows[0].id;
+  console.log('[createBook] ✅ Step 3 DONE - Book ID:', insertId, '| coverPath in DB:', coverPath);
 
   return {
-    id: result.insertId,
+    id: insertId,
     title: title || 'Untitled',
     description,
     cover_image: coverPath,
@@ -118,13 +119,13 @@ async function createBook({ title, description, category, pdfFile, uploadedBy })
 }
 
 async function deleteBook(id) {
-  const [rows] = await db.execute('SELECT pdf_url, cover_image FROM books WHERE id = ?', [id]);
+  const { rows } = await db.query('SELECT pdf_url, cover_image FROM books WHERE id = $1', [id]);
   if (rows && rows[0]) {
     await deleteFileByPath(rows[0].pdf_url);
     await deleteFileByPath(rows[0].cover_image);
   }
-  await db.execute('DELETE FROM mappings WHERE book_id = ?', [id]);
-  await db.execute('DELETE FROM books WHERE id = ?', [id]);
+  await db.query('DELETE FROM mappings WHERE book_id = $1', [id]);
+  await db.query('DELETE FROM books WHERE id = $1', [id]);
 }
 
 // ==================== 3D MODELS ====================
@@ -132,7 +133,7 @@ async function deleteBook(id) {
 async function listModels() {
   const sql = `SELECT id, name, file_url, thumbnail, view_state, category, created_at FROM models_3d WHERE file_url IS NOT NULL ORDER BY created_at DESC`;
   try {
-    const [rows] = await db.execute(sql);
+    const { rows } = await db.query(sql);
 
     return rows.map(model => ({
       id: model.id,
@@ -151,9 +152,9 @@ async function listModels() {
 
 async function getModelFilePath(id) {
   if (!id) return null;
-  const sql = `SELECT file_url FROM models_3d WHERE id = ? LIMIT 1`;
+  const sql = `SELECT file_url FROM models_3d WHERE id = $1 LIMIT 1`;
   try {
-    const [rows] = await db.execute(sql, [id]);
+    const { rows } = await db.query(sql, [id]);
     return rows && rows[0] ? rows[0].file_url : null;
   } catch (err) {
     console.error('admin.service.getModelFilePath error', err.message);
@@ -163,9 +164,9 @@ async function getModelFilePath(id) {
 
 async function getModelThumbnailPath(id) {
   if (!id) return null;
-  const sql = `SELECT thumbnail FROM models_3d WHERE id = ? LIMIT 1`;
+  const sql = `SELECT thumbnail FROM models_3d WHERE id = $1 LIMIT 1`;
   try {
-    const [rows] = await db.execute(sql, [id]);
+    const { rows } = await db.query(sql, [id]);
     return rows && rows[0] ? rows[0].thumbnail : null;
   } catch (err) {
     console.error('admin.service.getModelThumbnailPath error', err.message);
@@ -181,7 +182,7 @@ async function createModel({ name, category, modelFile, uploadedBy }) {
   const filePath = await uploadFile(modelFile, 'models/files');
   console.log('3D model uploaded to GCS path:', filePath);
 
-  const sql = `INSERT INTO models_3d (name, file_url, thumbnail, category, uploaded_by) VALUES (?, ?, ?, ?, ?)`;
+  const sql = `INSERT INTO models_3d (name, file_url, thumbnail, category, uploaded_by) VALUES ($1, $2, $3, $4, $5) RETURNING id`;
   const params = [
     name || 'Untitled Model',
     filePath,
@@ -189,10 +190,11 @@ async function createModel({ name, category, modelFile, uploadedBy }) {
     category || null,
     uploadedBy || null
   ];
-  const [result] = await db.execute(sql, params);
+  const { rows: insertRows } = await db.query(sql, params);
+  const insertId = insertRows[0].id;
 
   return {
-    id: result.insertId,
+    id: insertId,
     name: name || 'Untitled Model',
     file_url: filePath,
     thumbnail: null,
@@ -211,13 +213,13 @@ async function updateModelThumbnail(modelId, thumbnailBuffer, viewState = null) 
   );
 
   // Delete old thumbnail
-  const [rows] = await db.execute('SELECT thumbnail FROM models_3d WHERE id = ?', [modelId]);
+  const { rows } = await db.query('SELECT thumbnail FROM models_3d WHERE id = $1', [modelId]);
   if (rows?.[0]?.thumbnail) {
     await deleteFileByPath(rows[0].thumbnail);
   }
 
   const viewStateJson = viewState ? JSON.stringify(viewState) : null;
-  await db.execute('UPDATE models_3d SET thumbnail = ?, view_state = ? WHERE id = ?', [thumbnailPath, viewStateJson, modelId]);
+  await db.query('UPDATE models_3d SET thumbnail = $1, view_state = $2 WHERE id = $3', [thumbnailPath, viewStateJson, modelId]);
   return thumbnailPath;
 }
 
@@ -226,17 +228,17 @@ async function updateModelThumbnail(modelId, thumbnailBuffer, viewState = null) 
  */
 async function updateModelViewState(modelId, viewState) {
   const viewStateJson = viewState ? JSON.stringify(viewState) : null;
-  await db.execute('UPDATE models_3d SET view_state = ? WHERE id = ?', [viewStateJson, modelId]);
+  await db.query('UPDATE models_3d SET view_state = $1 WHERE id = $2', [viewStateJson, modelId]);
 }
 
 async function deleteModel(id) {
-  const [rows] = await db.execute('SELECT file_url, thumbnail FROM models_3d WHERE id = ?', [id]);
+  const { rows } = await db.query('SELECT file_url, thumbnail FROM models_3d WHERE id = $1', [id]);
   if (rows && rows[0]) {
     await deleteFileByPath(rows[0].file_url);
     await deleteFileByPath(rows[0].thumbnail);
   }
-  await db.execute('UPDATE mappings SET model_id = NULL WHERE model_id = ?', [id]);
-  await db.execute('DELETE FROM models_3d WHERE id = ?', [id]);
+  await db.query('UPDATE mappings SET model_id = NULL WHERE model_id = $1', [id]);
+  await db.query('DELETE FROM models_3d WHERE id = $1', [id]);
 }
 
 // ==================== MAPPINGS ====================
@@ -249,20 +251,20 @@ async function createMapping(payload, createdBy) {
     if (typeof v !== 'number' || v < 0 || v > 1) throw new Error('Coordinates must be 0..1');
   });
 
-  const sql = `INSERT INTO mappings (book_id, page_number, x, y, width, height, model_id, label, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const sql = `INSERT INTO mappings (book_id, page_number, x, y, width, height, model_id, label, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`;
   const params = [book_id, page_number, x, y, width, height, model_id, label || null, createdBy || null];
-  const [result] = await db.execute(sql, params);
-  return result.insertId;
+  const { rows: insertRows } = await db.query(sql, params);
+  return insertRows[0].id;
 }
 
 async function getMappings(bookId, pageNumber) {
-  const sql = `SELECT id, book_id, page_number, x, y, width, height, model_id, label, created_at FROM mappings WHERE book_id = ? AND page_number = ? ORDER BY id`;
-  const [rows] = await db.execute(sql, [bookId, pageNumber]);
+  const sql = `SELECT id, book_id, page_number, x, y, width, height, model_id, label, created_at FROM mappings WHERE book_id = $1 AND page_number = $2 ORDER BY id`;
+  const { rows } = await db.query(sql, [bookId, pageNumber]);
   return rows;
 }
 
 async function deleteMapping(id) {
-  await db.execute(`DELETE FROM mappings WHERE id = ?`, [id]);
+  await db.query(`DELETE FROM mappings WHERE id = $1`, [id]);
 }
 
 module.exports = {

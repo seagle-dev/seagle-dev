@@ -30,13 +30,13 @@ exports.register = async (req, res) => {
     const defaultRole = 'learner';
 
     try {
-      const [result] = await db.execute(
-        "INSERT INTO users (email, password_hash, role, first_name, last_name) VALUES (?, ?, ?, ?, ?)",
+      const { rows: insertRows } = await db.query(
+        "INSERT INTO users (email, password_hash, role, first_name, last_name) VALUES ($1, $2, $3, $4, $5) RETURNING id",
         [email, hash, defaultRole, firstName || '', lastName || '']
       );
-      console.log('DB insert result:', result.insertId);
+      const userId = insertRows[0].id;
+      console.log('DB insert result:', userId);
 
-      const userId = result.insertId;
       const userObj = { id: userId, email, firstName: firstName || '', lastName: lastName || '', role: defaultRole };
       const token = jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
 
@@ -46,7 +46,7 @@ exports.register = async (req, res) => {
       if (firebaseUser && firebaseUser.uid) {
         try { await admin.auth().deleteUser(firebaseUser.uid); } catch (_) {}
       }
-      if (dbErr.code === "ER_DUP_ENTRY") return res.status(400).json({ message: "User already exists" });
+      if (dbErr.code === "23505") return res.status(400).json({ message: "User already exists" });
       return res.status(500).json({ message: "DB error", error: dbErr.message });
     }
   } catch (err) {
@@ -64,7 +64,7 @@ exports.login = async (req, res) => {
       const fEmail = decoded.email;
       if (!fEmail) return res.status(400).json({ message: "Firebase token has no email" });
 
-      const [results] = await db.execute("SELECT * FROM users WHERE email = ?", [fEmail]);
+      const { rows: results } = await db.query("SELECT * FROM users WHERE email = $1", [fEmail]);
       const defaultRole = 'learner';
 
       if (results && results.length > 0) {
@@ -73,11 +73,11 @@ exports.login = async (req, res) => {
         return res.json({ token, user: { id: user.id, email: user.email } });
       }
 
-      const [insertRes] = await db.execute(
-        "INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)",
+      const { rows: insertRows } = await db.query(
+        "INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id",
         [fEmail, '', defaultRole]
       );
-      const newId = insertRes.insertId;
+      const newId = insertRows[0].id;
       const token = jwt.sign({ id: newId }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
       return res.json({ token, user: { id: newId, email: fEmail } });
     } catch (err) {
@@ -88,7 +88,7 @@ exports.login = async (req, res) => {
   if (!email || !password) return res.status(400).json({ message: "Email and password required" });
 
   try {
-    const [results] = await db.execute("SELECT * FROM users WHERE email = ?", [email]);
+    const { rows: results } = await db.query("SELECT * FROM users WHERE email = $1", [email]);
     if (!results || results.length === 0) return res.status(401).json({ message: "Invalid credentials" });
 
     const user = results[0];
@@ -115,7 +115,7 @@ exports.firebaseAuth = async (req, res) => {
 
     const defaultRole = 'learner';
 
-    const [results] = await db.execute("SELECT * FROM users WHERE email = ?", [email]);
+    const { rows: results } = await db.query("SELECT * FROM users WHERE email = $1", [email]);
 
     if (results && results.length > 0) {
       const user = results[0];
@@ -123,11 +123,11 @@ exports.firebaseAuth = async (req, res) => {
       return res.json({ token, user: { id: user.id, email: user.email } });
     }
 
-    const [insertRes] = await db.execute(
-      "INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)",
+    const { rows: insertRows } = await db.query(
+      "INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id",
       [email, '', defaultRole]
     );
-    const newId = insertRes.insertId;
+    const newId = insertRows[0].id;
     const token = jwt.sign({ id: newId }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "24h" });
     return res.json({ token, user: { id: newId, email } });
   } catch (err) {
@@ -145,7 +145,7 @@ exports.autoLogin = async (req, res) => {
       return res.status(400).json({ message: 'AUTO_LOGIN_EMAIL and AUTO_LOGIN_PASSWORD must be set in .env' });
     }
 
-    const [rows] = await db.execute('SELECT * FROM users WHERE email = ? LIMIT 1', [devEmail]);
+    const { rows } = await db.query('SELECT * FROM users WHERE email = $1 LIMIT 1', [devEmail]);
     console.log('auth.autoLogin DB rows length=', rows?.length || 0);
 
     if (!rows || rows.length === 0) {
@@ -195,8 +195,8 @@ exports.refreshToken = (req, res) => {
 
 exports.profile = async (req, res) => {
   try {
-    const [rows] = await db.execute(
-      'SELECT id, email, role, first_name, last_name, username, department, course, year_level, classes_enrolled, classes_completed FROM users WHERE id = ? LIMIT 1',
+    const { rows } = await db.query(
+      'SELECT id, email, role, first_name, last_name, username, department, course, year_level, classes_enrolled, classes_completed FROM users WHERE id = $1 LIMIT 1',
       [req.user.id],
     );
 
@@ -228,8 +228,8 @@ exports.updateProfile = async (req, res) => {
   const { firstName, lastName, username } = req.body;
   
   try {
-    await db.execute(
-      "UPDATE users SET first_name = ?, last_name = ?, username = ? WHERE id = ?",
+    await db.query(
+      "UPDATE users SET first_name = $1, last_name = $2, username = $3 WHERE id = $4",
       [firstName || '', lastName || '', username || '', req.user.id]
     );
 
@@ -248,7 +248,7 @@ exports.changePassword = async (req, res) => {
   }
 
   try {
-    const [rows] = await db.execute("SELECT * FROM users WHERE id = ?", [req.user.id]);
+    const { rows } = await db.query("SELECT * FROM users WHERE id = $1", [req.user.id]);
     if (!rows || rows.length === 0) return res.status(404).json({ message: "User not found" });
 
     const user = rows[0];
@@ -262,7 +262,7 @@ exports.changePassword = async (req, res) => {
     }
 
     const newHash = await bcrypt.hash(newPassword, 10);
-    await db.execute("UPDATE users SET password_hash = ? WHERE id = ?", [newHash, req.user.id]);
+    await db.query("UPDATE users SET password_hash = $1 WHERE id = $2", [newHash, req.user.id]);
 
     res.json({ message: "Password updated successfully" });
   } catch (err) {
@@ -278,7 +278,7 @@ exports.forgotPassword = async (req, res) => {
   }
 
   try {
-    const [rows] = await db.execute("SELECT * FROM users WHERE email = ?", [email]);
+    const { rows } = await db.query("SELECT * FROM users WHERE email = $1", [email]);
     if (rows && rows.length > 0) {
       const user = rows[0];
       if (user.password_hash) {
@@ -287,11 +287,11 @@ exports.forgotPassword = async (req, res) => {
         const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
         // Delete any existing OTPs for this email to prevent spam
-        await db.execute("DELETE FROM password_resets WHERE email = ?", [email]);
+        await db.query("DELETE FROM password_resets WHERE email = $1", [email]);
 
         // Save new OTP
-        await db.execute(
-          "INSERT INTO password_resets (email, otp, expires_at) VALUES (?, ?, ?)",
+        await db.query(
+          "INSERT INTO password_resets (email, otp, expires_at) VALUES ($1, $2, $3)",
           [email, otp, expiresAt]
         );
 
@@ -333,8 +333,8 @@ exports.resetPassword = async (req, res) => {
 
   try {
     // Find the OTP record
-    const [resetRows] = await db.execute(
-      "SELECT * FROM password_resets WHERE email = ? AND otp = ? AND expires_at > NOW()",
+    const { rows: resetRows } = await db.query(
+      "SELECT * FROM password_resets WHERE email = $1 AND otp = $2 AND expires_at > NOW()",
       [email, otp]
     );
 
@@ -343,7 +343,7 @@ exports.resetPassword = async (req, res) => {
     }
 
     // Verify the user exists
-    const [userRows] = await db.execute("SELECT id FROM users WHERE email = ?", [email]);
+    const { rows: userRows } = await db.query("SELECT id FROM users WHERE email = $1", [email]);
     if (!userRows || userRows.length === 0) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -352,10 +352,10 @@ exports.resetPassword = async (req, res) => {
 
     // Hash the new password and update the user
     const newHash = await bcrypt.hash(newPassword, 10);
-    await db.execute("UPDATE users SET password_hash = ? WHERE id = ?", [newHash, userId]);
+    await db.query("UPDATE users SET password_hash = $1 WHERE id = $2", [newHash, userId]);
 
     // Delete the used OTP
-    await db.execute("DELETE FROM password_resets WHERE email = ?", [email]);
+    await db.query("DELETE FROM password_resets WHERE email = $1", [email]);
 
     res.json({ message: "Password has been successfully reset" });
   } catch (err) {
