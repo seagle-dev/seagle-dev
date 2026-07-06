@@ -6,14 +6,20 @@ import {
 import PdfAnnotator from '../component/PdfAnnotator';
 import ModelThumbnailCapture from '../component/ModelThumbnailCapture';
 import ConfirmationModal from '../component/ConfirmationModal';
+import { useToast } from '../component/Toast';
 
 setToken(localStorage.getItem('token') || '');
 
 export default function AdminPage() {
+  const toast = useToast();
   const [books, setBooks] = useState([]);
   const [models, setModels] = useState([]);
   const [selectedBook, setSelectedBook] = useState(null);
   const [activeTab, setActiveTab] = useState('annotate');
+
+  // Responsive state
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Confirmation modal state
   const [confirmModal, setConfirmModal] = useState({
@@ -45,6 +51,16 @@ export default function AdminPage() {
       }
     }
     init();
+
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setIsSidebarOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   async function refreshData() {
@@ -58,7 +74,7 @@ export default function AdminPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.name.toLowerCase().endsWith('.pdf')) {
-      alert('Please select a PDF file');
+      toast.warning('Please select a PDF file');
       return;
     }
     setUploadingBook(true);
@@ -71,10 +87,10 @@ export default function AdminPage() {
       setBookForm({ title: '', description: '', category: '' });
       if (pdfInputRef.current) pdfInputRef.current.value = '';
       await refreshData();
-      alert('✅ Book uploaded successfully! Cover was auto-generated from page 1.');
+      toast.success('Book uploaded successfully! Cover was auto-generated from page 1.');
     } catch (err) {
       console.error('Book upload error:', err);
-      alert('Failed to upload book: ' + (err.response?.data?.message || err.message));
+      toast.error('Failed to upload book: ' + (err.response?.data?.message || err.message));
     } finally {
       setUploadingBook(false);
     }
@@ -90,8 +106,10 @@ export default function AdminPage() {
           await deleteBook(id);
           if (selectedBook?.id === id) setSelectedBook(null);
           await refreshData();
+          toast.success('Book deleted successfully');
         } catch (err) {
           console.error('Failed to delete book:', err);
+          toast.error('Failed to delete book');
         }
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
@@ -100,12 +118,11 @@ export default function AdminPage() {
 
   // ===== Model Upload =====
   async function handleModelUpload(e) {
-    // ... rest of handleModelUpload implementation stays exactly the same
     const file = e.target.files?.[0];
     if (!file) return;
     const ext = file.name.toLowerCase().split('.').pop();
     if (!['glb', 'gltf'].includes(ext)) {
-      alert('Please select a .glb or .gltf file');
+      toast.warning('Please select a .glb or .gltf file');
       return;
     }
     setUploadingModel(true);
@@ -117,11 +134,12 @@ export default function AdminPage() {
       setModelForm({ name: '', category: '' });
       if (modelInputRef.current) modelInputRef.current.value = '';
       await refreshData();
+      toast.success('Model uploaded successfully! Please capture a thumbnail.');
       // Show thumbnail capture dialog
       setPendingThumbnail({ modelId: result.id, file_url: result.file_url, name: result.name });
     } catch (err) {
       console.error('Model upload error:', err);
-      alert('Failed to upload model: ' + (err.response?.data?.message || err.message));
+      toast.error('Failed to upload model: ' + (err.response?.data?.message || err.message));
     } finally {
       setUploadingModel(false);
     }
@@ -133,8 +151,10 @@ export default function AdminPage() {
       try {
         await uploadModelThumbnail(pendingThumbnail.modelId, blob, viewState);
         await refreshData();
+        toast.success('Model thumbnail captured successfully');
       } catch (err) {
         console.error('Thumbnail upload error:', err);
+        toast.error('Failed to upload thumbnail');
       }
     }
     setPendingThumbnail(null);
@@ -149,8 +169,10 @@ export default function AdminPage() {
         try {
           await deleteModel(id);
           await refreshData();
+          toast.success('Model deleted successfully');
         } catch (err) {
           console.error('Failed to delete model:', err);
+          toast.error('Failed to delete model');
         }
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
@@ -158,187 +180,280 @@ export default function AdminPage() {
   }
 
   const tabStyle = (key) => ({
-    flex: 1, padding: '10px 8px', border: 'none', cursor: 'pointer',
-    fontSize: '12px', fontWeight: 'bold', transition: 'all 0.2s',
-    background: activeTab === key ? '#fff' : '#f5f5f5',
-    color: activeTab === key ? '#333' : '#888',
-    borderBottom: activeTab === key ? '2px solid #3498db' : '2px solid transparent',
+    flex: 1,
+    padding: '14px 8px',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: 'bold',
+    fontFamily: 'var(--font-sans)',
+    transition: 'all var(--transition-fast)',
+    background: activeTab === key ? 'var(--color-bg-white)' : 'var(--color-bg-primary)',
+    color: activeTab === key ? 'var(--color-navy)' : 'var(--color-text-secondary)',
+    borderBottom: activeTab === key ? '3.5px solid var(--color-orange)' : '3.5px solid transparent',
   });
 
-  return (
-    <div style={{ display: 'flex', height: '100%', background: '#f5f5f5' }}>
-      {/* Left Sidebar */}
-      <aside style={{ width: 340, background: '#fff', borderRight: '1px solid #e0e0e0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid #e0e0e0', flexShrink: 0 }}>
-          <button onClick={() => setActiveTab('annotate')} style={tabStyle('annotate')}>✏️ Annotate</button>
-          <button onClick={() => setActiveTab('books')} style={tabStyle('books')}>📚 Books</button>
-          <button onClick={() => setActiveTab('models')} style={tabStyle('models')}>🧊 Models</button>
-        </div>
+  const renderSidebar = () => (
+    <aside 
+      className={isMobile ? 'mobile-drawer-left' : ''}
+      style={isMobile ? {} : { width: 340, background: 'var(--color-bg-white)', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0 }}
+    >
+      {isMobile && (
+        <button onClick={() => setIsSidebarOpen(false)} className="drawer-close-btn" aria-label="Close sidebar">
+          ✕
+        </button>
+      )}
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-          {/* ===== ANNOTATE TAB ===== */}
-          {activeTab === 'annotate' && (
-            <>
-              <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: '#2c3e50' }}>Select Book to Annotate</h3>
-              {books.length === 0 ? (
-                <p style={{ color: '#999', fontStyle: 'italic', textAlign: 'center', padding: '20px 0' }}>
-                  No books yet. Upload one in the Books tab.
-                </p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {books.map(b => (
-                    <div key={b.id} onClick={() => setSelectedBook(b)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '10px',
-                        padding: '8px 10px', borderRadius: '6px', cursor: 'pointer',
-                        background: selectedBook?.id === b.id ? '#e3f2fd' : '#fafafa',
-                        border: selectedBook?.id === b.id ? '1px solid #90caf9' : '1px solid #eee',
-                        transition: 'all 0.15s',
-                      }}>
-                      {b.cover_image ? (
-                        <img src={b.cover_image} alt="" style={{ width: 40, height: 52, objectFit: 'cover', borderRadius: '3px', flexShrink: 0, background: '#eee' }} />
-                      ) : (
-                        <div style={{ width: 40, height: 52, background: '#e0e0e0', borderRadius: '3px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>📄</div>
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '13px', fontWeight: '600', color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.title}</div>
-                        {b.category && <div style={{ fontSize: '10px', color: '#999' }}>{b.category}</div>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
+      {/* Tabs */}
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', flexShrink: 0, paddingRight: isMobile ? '40px' : '0' }}>
+        <button onClick={() => setActiveTab('annotate')} style={tabStyle('annotate')}>✏️ Annotate</button>
+        <button onClick={() => setActiveTab('books')} style={tabStyle('books')}>📚 Books</button>
+        <button onClick={() => setActiveTab('models')} style={tabStyle('models')}>🧊 Models</button>
+      </div>
 
-          {/* ===== BOOKS TAB ===== */}
-          {activeTab === 'books' && (
-            <>
-              <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: '#2c3e50' }}>📚 Manage Books</h3>
-
-              {/* Upload Form */}
-              <div style={{ background: '#f0f8ff', border: '1px solid #b3d9ff', borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
-                <h4 style={{ margin: '0 0 10px', fontSize: '13px', color: '#1565c0' }}>Upload New Book</h4>
-                <p style={{ fontSize: '10px', color: '#888', margin: '0 0 8px' }}>
-                  📄 PDF → Firebase Storage &nbsp;|&nbsp; 🖼️ Cover auto-generated from page 1
-                </p>
-                <input type="text" placeholder="Book title" value={bookForm.title}
-                  onChange={(e) => setBookForm(f => ({ ...f, title: e.target.value }))}
-                  style={inputStyle} />
-                <input type="text" placeholder="Description (optional)" value={bookForm.description}
-                  onChange={(e) => setBookForm(f => ({ ...f, description: e.target.value }))}
-                  style={inputStyle} />
-                <input type="text" placeholder="Category (optional)" value={bookForm.category}
-                  onChange={(e) => setBookForm(f => ({ ...f, category: e.target.value }))}
-                  style={{ ...inputStyle, marginBottom: '10px' }} />
-                <input ref={pdfInputRef} type="file" accept=".pdf" onChange={handleBookUpload} disabled={uploadingBook} style={{ display: 'none' }} />
-                <button onClick={() => pdfInputRef.current?.click()} disabled={uploadingBook}
-                  style={{ ...uploadBtnStyle, background: uploadingBook ? '#ccc' : '#1976d2', cursor: uploadingBook ? 'not-allowed' : 'pointer' }}>
-                  {uploadingBook ? '⏳ Uploading & generating cover...' : '📁 Select PDF & Upload'}
-                </button>
-              </div>
-
-              {/* Book List */}
-              <h4 style={{ margin: '0 0 8px', fontSize: '13px', color: '#555' }}>Uploaded Books ({books.length})</h4>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+        {/* ===== ANNOTATE TAB ===== */}
+        {activeTab === 'annotate' && (
+          <>
+            <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 'bold', color: 'var(--color-navy)' }}>Select Book to Annotate</h3>
+            {books.length === 0 ? (
+              <p style={{ color: 'var(--color-text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '24px 0', fontSize: '13px' }}>
+                No books yet. Upload one in the Books tab.
+              </p>
+            ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {books.map(b => (
-                  <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: '#fff', border: '1px solid #eee', borderRadius: '6px' }}>
+                  <div key={b.id} onClick={() => { setSelectedBook(b); if (isMobile) setIsSidebarOpen(false); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '12px',
+                      padding: '10px 12px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                      background: selectedBook?.id === b.id ? 'var(--color-orange-bg)' : 'var(--color-bg-white)',
+                      border: selectedBook?.id === b.id ? '1px solid var(--color-orange)' : '1px solid var(--color-border)',
+                      boxShadow: selectedBook?.id === b.id ? 'var(--shadow-sm)' : 'none',
+                      transition: 'all var(--transition-fast)',
+                    }}
+                    onMouseOver={(e) => {
+                      if (selectedBook?.id !== b.id) {
+                        e.currentTarget.style.borderColor = 'var(--color-text-muted)';
+                        e.currentTarget.style.background = 'var(--color-border-light)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (selectedBook?.id !== b.id) {
+                        e.currentTarget.style.borderColor = 'var(--color-border)';
+                        e.currentTarget.style.background = 'var(--color-bg-white)';
+                      }
+                    }}
+                    >
                     {b.cover_image ? (
-                      <img src={b.cover_image} alt="" style={{ width: 44, height: 58, objectFit: 'cover', borderRadius: '4px', flexShrink: 0, background: '#f0f0f0' }} />
+                      <img src={b.cover_image} alt="" style={{ width: 42, height: 56, objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0, background: 'var(--color-bg-primary)', boxShadow: 'var(--shadow-sm)' }} />
                     ) : (
-                      <div style={{ width: 44, height: 58, background: '#eee', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>📄</div>
+                      <div style={{ width: 42, height: 56, background: 'var(--color-bg-primary)', borderRadius: 'var(--radius-sm)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>📄</div>
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.title}</div>
-                      {b.description && <div style={{ fontSize: '10px', color: '#777', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.description}</div>}
-                      {b.category && <div style={{ fontSize: '10px', color: '#999' }}>📁 {b.category}</div>}
-                      <div style={{ fontSize: '9px', color: '#bbb' }}>{b.created_at ? new Date(b.created_at).toLocaleDateString() : ''}</div>
+                      <div style={{ fontSize: '13.5px', fontWeight: '600', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.title}</div>
+                      {b.category && <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>{b.category}</div>}
                     </div>
-                    <button onClick={() => handleDeleteBook(b.id)}
-                      style={{ padding: '4px 8px', background: '#ef5350', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', flexShrink: 0 }}>
-                      🗑
-                    </button>
                   </div>
                 ))}
-                {books.length === 0 && <p style={{ color: '#999', textAlign: 'center', fontStyle: 'italic' }}>No books uploaded yet</p>}
               </div>
-            </>
-          )}
+            )}
+          </>
+        )}
 
-          {/* ===== MODELS TAB ===== */}
-          {activeTab === 'models' && (
-            <>
-              <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: '#2c3e50' }}>🧊 Manage 3D Models</h3>
+        {/* ===== BOOKS TAB ===== */}
+        {activeTab === 'books' && (
+          <>
+            <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 'bold', color: 'var(--color-navy)' }}>📚 Manage Books</h3>
 
-              {/* Upload Form */}
-              <div style={{ background: '#f0fff0', border: '1px solid #b3e6b3', borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
-                <h4 style={{ margin: '0 0 10px', fontSize: '13px', color: '#2e7d32' }}>Upload New Model</h4>
-                <p style={{ fontSize: '10px', color: '#888', margin: '0 0 8px' }}>
-                  🧊 GLB/GLTF → Firebase Storage &nbsp;|&nbsp; 📸 Thumbnail captured from 3D preview
-                </p>
-                <input type="text" placeholder="Model name" value={modelForm.name}
-                  onChange={(e) => setModelForm(f => ({ ...f, name: e.target.value }))}
-                  style={inputStyle} />
-                <input type="text" placeholder="Category (optional)" value={modelForm.category}
-                  onChange={(e) => setModelForm(f => ({ ...f, category: e.target.value }))}
-                  style={{ ...inputStyle, marginBottom: '10px' }} />
-                <input ref={modelInputRef} type="file" accept=".glb,.gltf" onChange={handleModelUpload} disabled={uploadingModel} style={{ display: 'none' }} />
-                <button onClick={() => modelInputRef.current?.click()} disabled={uploadingModel}
-                  style={{ ...uploadBtnStyle, background: uploadingModel ? '#ccc' : '#388e3c', cursor: uploadingModel ? 'not-allowed' : 'pointer' }}>
-                  {uploadingModel ? '⏳ Uploading model...' : '📁 Select GLB/GLTF & Upload'}
-                </button>
-              </div>
+            {/* Upload Form */}
+            <div style={{ background: 'var(--color-orange-bg)', border: '1px solid var(--color-orange-light)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '20px', boxShadow: 'var(--shadow-sm)' }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: '13.5px', color: 'var(--color-navy)', fontWeight: 'bold' }}>Upload New Book</h4>
+              <p style={{ fontSize: '11px', color: 'var(--color-text-secondary)', margin: '0 0 12px' }}>
+                PDF will be stored. Cover is auto-generated.
+              </p>
+              <input type="text" placeholder="Book title" value={bookForm.title}
+                onChange={(e) => setBookForm(f => ({ ...f, title: e.target.value }))}
+                style={inputStyle} />
+              <input type="text" placeholder="Description (optional)" value={bookForm.description}
+                onChange={(e) => setBookForm(f => ({ ...f, description: e.target.value }))}
+                style={inputStyle} />
+              <input type="text" placeholder="Category (optional)" value={bookForm.category}
+                onChange={(e) => setBookForm(f => ({ ...f, category: e.target.value }))}
+                style={{ ...inputStyle, marginBottom: '14px' }} />
+              <input ref={pdfInputRef} type="file" accept=".pdf" onChange={handleBookUpload} disabled={uploadingBook} style={{ display: 'none' }} />
+              
+              <button 
+                onClick={() => pdfInputRef.current?.click()} 
+                disabled={uploadingBook}
+                className="btn-accent"
+                style={{ width: '100%', padding: '11px' }}
+              >
+                {uploadingBook ? '⏳ Uploading & processing...' : '📁 Select PDF & Upload'}
+              </button>
+            </div>
 
-              {/* Model List */}
-              <h4 style={{ margin: '0 0 8px', fontSize: '13px', color: '#555' }}>Uploaded Models ({models.length})</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {models.map(m => (
-                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: '#fff', border: '1px solid #eee', borderRadius: '6px' }}>
-                    {m.thumbnail ? (
-                      <img src={m.thumbnail} alt="" style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: '4px', flexShrink: 0, background: '#f0f0f0' }} />
-                    ) : (
-                      <div style={{ width: 50, height: 50, background: '#eee', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>🧊</div>
+            {/* Book List */}
+            <h4 style={{ margin: '0 0 10px', fontSize: '13.5px', color: 'var(--color-text-secondary)', fontWeight: 'bold' }}>Uploaded Books ({books.length})</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {books.map(b => (
+                <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--color-bg-white)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
+                  {b.cover_image ? (
+                    <img src={b.cover_image} alt="" style={{ width: 44, height: 58, objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0, background: 'var(--color-bg-primary)' }} />
+                  ) : (
+                    <div style={{ width: 44, height: 58, background: 'var(--color-bg-primary)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>📄</div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.title}</div>
+                    {b.description && <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>{b.description}</div>}
+                    {b.category && <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>📁 {b.category}</div>}
+                  </div>
+                  <button 
+                    onClick={() => handleDeleteBook(b.id)}
+                    className="btn-danger"
+                    style={{ padding: '6px 10px', fontSize: '12px', borderRadius: 'var(--radius-md)' }}
+                  >
+                    🗑
+                  </button>
+                </div>
+              ))}
+              {books.length === 0 && <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', fontStyle: 'italic', padding: '12px 0', fontSize: '12px' }}>No books uploaded yet</p>}
+            </div>
+          </>
+        )}
+
+        {/* ===== MODELS TAB ===== */}
+        {activeTab === 'models' && (
+          <>
+            <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 'bold', color: 'var(--color-navy)' }}>🧊 Manage 3D Models</h3>
+
+            {/* Upload Form */}
+            <div style={{ background: 'var(--color-bg-light)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '20px', boxShadow: 'var(--shadow-sm)' }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: '13.5px', color: 'var(--color-navy-deep)', fontWeight: 'bold' }}>Upload New Model</h4>
+              <p style={{ fontSize: '11px', color: 'var(--color-text-secondary)', margin: '0 0 12px' }}>
+                GLB/GLTF models. Thumbnail is generated from 3D view.
+              </p>
+              <input type="text" placeholder="Model name" value={modelForm.name}
+                onChange={(e) => setModelForm(f => ({ ...f, name: e.target.value }))}
+                style={inputStyle} />
+              <input type="text" placeholder="Category (optional)" value={modelForm.category}
+                onChange={(e) => setModelForm(f => ({ ...f, category: e.target.value }))}
+                style={{ ...inputStyle, marginBottom: '14px' }} />
+              <input ref={modelInputRef} type="file" accept=".glb,.gltf" onChange={handleModelUpload} disabled={uploadingModel} style={{ display: 'none' }} />
+              
+              <button 
+                onClick={() => modelInputRef.current?.click()} 
+                disabled={uploadingModel}
+                className="btn-primary"
+                style={{ width: '100%', padding: '11px' }}
+              >
+                {uploadingModel ? '⏳ Uploading model...' : '📁 Select GLB/GLTF & Upload'}
+              </button>
+            </div>
+
+            {/* Model List */}
+            <h4 style={{ margin: '0 0 10px', fontSize: '13.5px', color: 'var(--color-text-secondary)', fontWeight: 'bold' }}>Uploaded Models ({models.length})</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {models.map(m => (
+                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--color-bg-white)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
+                  {m.thumbnail ? (
+                    <img src={m.thumbnail} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0, background: 'var(--color-bg-primary)', border: '1px solid var(--color-border)' }} />
+                  ) : (
+                    <div style={{ width: 44, height: 44, background: 'var(--color-bg-primary)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0, border: '1px solid var(--color-border)' }}>🧊</div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
+                    {m.category && <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>📁 {m.category}</div>}
+                    {!m.thumbnail && (
+                      <button onClick={() => setPendingThumbnail({ modelId: m.id, file_url: m.file_url, name: m.name })}
+                        style={{ fontSize: '11px', color: 'var(--color-orange)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', marginTop: '4px', fontWeight: 'bold' }}>
+                        📸 Generate thumbnail
+                      </button>
                     )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
-                      {m.category && <div style={{ fontSize: '10px', color: '#999' }}>📁 {m.category}</div>}
-                      {!m.thumbnail && (
-                        <button onClick={() => setPendingThumbnail({ modelId: m.id, file_url: m.file_url, name: m.name })}
-                          style={{ fontSize: '10px', color: '#1976d2', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', marginTop: '2px' }}>
-                          📸 Generate thumbnail
-                        </button>
-                      )}
-                    </div>
-                    <button onClick={() => handleDeleteModel(m.id)}
-                      style={{ padding: '4px 8px', background: '#ef5350', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', flexShrink: 0 }}>
-                      🗑
-                    </button>
                   </div>
-                ))}
-                {models.length === 0 && <p style={{ color: '#999', textAlign: 'center', fontStyle: 'italic' }}>No models uploaded yet</p>}
-              </div>
-            </>
-          )}
-        </div>
-      </aside>
+                  <button 
+                    onClick={() => handleDeleteModel(m.id)}
+                    className="btn-danger"
+                    style={{ padding: '6px 10px', fontSize: '12px', borderRadius: 'var(--radius-md)' }}
+                  >
+                    🗑
+                  </button>
+                </div>
+              ))}
+              {models.length === 0 && <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', fontStyle: 'italic', padding: '12px 0', fontSize: '12px' }}>No models uploaded yet</p>}
+            </div>
+          </>
+        )}
+      </div>
+    </aside>
+  );
+
+  return (
+    <div style={{ display: 'flex', height: '100%', background: 'var(--color-bg-primary)', position: 'relative' }}>
+      {/* Sidebar responsive toggle */}
+      {isMobile ? (
+        isSidebarOpen && (
+          <>
+            <div className="mobile-drawer-overlay" onClick={() => setIsSidebarOpen(false)} />
+            {renderSidebar()}
+          </>
+        )
+      ) : (
+        renderSidebar()
+      )}
 
       {/* Main Content */}
-      <main style={{ flex: 1, overflow: 'hidden' }}>
+      <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {selectedBook ? (
           <PdfAnnotator book={selectedBook} models={models} />
         ) : (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#999' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '48px', marginBottom: '12px', opacity: 0.3 }}>✏️</div>
-              <p style={{ fontSize: '16px' }}>Select a book from the Annotate tab to start</p>
-              <p style={{ fontSize: '12px', color: '#bbb', marginTop: '8px' }}>
-                Or upload books and models using the tabs on the left
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--color-text-muted)', padding: '24px' }}>
+            <div style={{ textAlign: 'center', maxWidth: '380px' }}>
+              <div style={{ fontSize: '56px', marginBottom: '16px', opacity: 0.8 }}>✏️</div>
+              <h2 style={{ fontSize: '20px', color: 'var(--color-navy)', fontWeight: 'bold', marginBottom: '8px' }}>Start Annotating</h2>
+              <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
+                Select a textbook from the list on the left to start placing 3D model hotspots.
               </p>
+              {isMobile ? (
+                <p style={{ fontSize: '13px', color: 'var(--color-orange)', fontWeight: 'bold', marginTop: '16px' }}>
+                  Tap the 📚 button below to open the textbook list.
+                </p>
+              ) : (
+                <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '16px', borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
+                  Or upload new books and GLB/GLTF models using the management tabs.
+                </p>
+              )}
             </div>
           </div>
         )}
       </main>
+
+      {/* Mobile Sidebar Floating Button */}
+      {isMobile && (
+        <button 
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="btn-accent"
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            left: '24px',
+            zIndex: 999,
+            borderRadius: '50%',
+            width: '56px',
+            height: '56px',
+            fontSize: '22px',
+            boxShadow: 'var(--shadow-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 0,
+            border: 'none',
+          }}
+          aria-label={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+        >
+          {isSidebarOpen ? '✕' : '📚'}
+        </button>
+      )}
 
       {/* Thumbnail Capture Modal */}
       {pendingThumbnail && (
@@ -363,12 +478,5 @@ export default function AdminPage() {
 }
 
 const inputStyle = {
-  width: '100%', padding: '8px 10px', borderRadius: '4px',
-  border: '1px solid #ddd', fontSize: '13px', boxSizing: 'border-box',
-  marginBottom: '6px',
-};
-
-const uploadBtnStyle = {
-  width: '100%', padding: '10px', border: 'none', borderRadius: '6px',
-  color: '#fff', fontWeight: 'bold', fontSize: '13px',
+  marginBottom: '8px',
 };

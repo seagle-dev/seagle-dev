@@ -127,16 +127,16 @@ const InlineModelOverlay = React.memo(function InlineModelOverlay({ mapping, mod
           <button
             onClick={toggleMode}
             style={{
-              background: is3D ? '#2ecc71' : '#fff',
-              color: is3D ? '#fff' : '#2ecc71',
-              border: '2px solid #2ecc71',
-              borderRadius: '6px',
+              background: is3D ? 'var(--color-orange)' : 'var(--color-bg-white)',
+              color: is3D ? 'var(--color-white)' : 'var(--color-orange)',
+              border: '2px solid var(--color-orange)',
+              borderRadius: 'var(--radius-md)',
               padding: '4px 12px',
               fontSize: '11px',
               fontWeight: '700',
               cursor: 'pointer',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              transition: 'all 0.2s',
+              boxShadow: 'var(--shadow-sm)',
+              transition: 'all var(--transition-fast)',
               whiteSpace: 'nowrap',
             }}
           >
@@ -145,16 +145,16 @@ const InlineModelOverlay = React.memo(function InlineModelOverlay({ mapping, mod
           <button
             onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
             style={{
-              background: '#fff',
-              color: '#4a90d9',
-              border: '2px solid #4a90d9',
-              borderRadius: '6px',
+              background: 'var(--color-bg-white)',
+              color: 'var(--color-navy)',
+              border: '2px solid var(--color-navy)',
+              borderRadius: 'var(--radius-md)',
               padding: '4px 10px',
               fontSize: '11px',
               fontWeight: '700',
               cursor: 'pointer',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              transition: 'all 0.2s',
+              boxShadow: 'var(--shadow-sm)',
+              transition: 'all var(--transition-fast)',
             }}
             title="Full Screen"
           >
@@ -229,6 +229,19 @@ export default function BookViewer({ book }) {
   const [show3DDiagrams, setShow3DDiagrams] = useState(true);
   const [showHeader, setShowHeader] = useState(true);
   const lastScrollTop = useRef(0);
+
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setIsSidebarOpen(false);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (book?.id) {
@@ -319,6 +332,59 @@ export default function BookViewer({ book }) {
     );
   }, [pageMappings, modelMap, show3DDiagrams]);
 
+  const renderModelsSidebar = () => (
+    <aside 
+      className={isMobile ? 'mobile-drawer-right' : ''}
+      style={isMobile ? { background: '#3B3D3F', padding: '16px', overflowY: 'auto', zIndex: 1001 } : {
+        width: '280px', background: '#3B3D3F', borderLeft: '1px solid rgba(255,255,255,0.1)',
+        overflowY: 'auto', padding: '16px', flexShrink: 0,
+      }}
+    >
+      {isMobile && (
+        <button onClick={() => setIsSidebarOpen(false)} className="drawer-close-btn" aria-label="Close models list" style={{ top: '8px', right: '8px', color: '#F5F5F5', background: 'rgba(255,255,255,0.1)' }}>
+          ✕
+        </button>
+      )}
+      <h3 style={{ marginTop: isMobile ? '32px' : 0, fontSize: '15px', color: '#F5F5F5', fontWeight: '600' }}>
+        3D Models on Page {pageNumber}
+      </h3>
+      <div style={{ fontSize: '11px', color: 'rgba(245,245,245,0.5)', marginBottom: '12px' }}>
+        {pageMappings.length} annotation{pageMappings.length !== 1 ? 's' : ''}
+      </div>
+
+      {pageMappings.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '24px 0' }}>
+          <div style={{ fontSize: '28px', opacity: 0.3, color: '#fff', marginBottom: '8px' }}>📄</div>
+          <p style={{ color: 'rgba(245,245,245,0.4)', fontSize: '12px', fontStyle: 'italic' }}>No 3D models on this page</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {pageMappings.map((m) => {
+            const model = modelMap.get(m.model_id);
+            return (
+              <div key={m.id} style={{
+                padding: '10px', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px',
+                background: 'rgba(255,255,255,0.03)', transition: 'all 0.2s',
+              }}>
+                {model?.thumbnail && (
+                  <img src={model.thumbnail} alt={model.name}
+                    style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '4px', marginBottom: '6px' }} />
+                )}
+                <div style={{ fontWeight: '600', marginBottom: '2px', fontSize: '13px', color: '#F5F5F5' }}>
+                  {model?.name || m.label || `Model ${m.model_id}`}
+                </div>
+                <div style={{ fontSize: '10px', color: 'rgba(245,245,245,0.5)' }}>
+                  Position: ({(m.x * 100).toFixed(0)}%, {(m.y * 100).toFixed(0)}%) •
+                  Size: {(m.width * 100).toFixed(0)}%×{(m.height * 100).toFixed(0)}%
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </aside>
+  );
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', background: '#fafafa' }}>
@@ -389,19 +455,36 @@ export default function BookViewer({ book }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button onClick={() => goToPage(pageNumber - 1)} disabled={pageNumber <= 1}
-            style={{ ...navBtnStyle, opacity: pageNumber <= 1 ? 0.4 : 1, cursor: pageNumber <= 1 ? 'not-allowed' : 'pointer' }}>
-            ← Previous
+            style={{ ...navBtnStyle, opacity: pageNumber <= 1 ? 0.4 : 1, cursor: pageNumber <= 1 ? 'not-allowed' : 'pointer', padding: isMobile ? '6px 8px' : '7px 14px' }}>
+            {isMobile ? '←' : '← Previous'}
           </button>
           <input type="number" value={pageNumber}
             onChange={(e) => { const v = Number(e.target.value); if (v >= 1 && v <= (numPages || 1)) goToPage(v); }}
             min={1} max={numPages || 1}
-            style={{ width: '50px', padding: '6px', fontSize: '13px', textAlign: 'center', borderRadius: '4px', border: '1px solid #ccc', background: 'transparent', color: '#F5F5F5' }}
+            style={{ width: '45px', padding: '6px 4px', fontSize: '13px', textAlign: 'center', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: '#F5F5F5' }}
           />
-          <span style={{ color: 'rgba(245,245,245,0.7)', fontSize: '13px' }}>of {numPages || '?'}</span>
+          <span style={{ color: 'rgba(245,245,245,0.7)', fontSize: '13px' }}>/ {numPages || '?'}</span>
           <button onClick={() => goToPage(pageNumber + 1)} disabled={pageNumber >= numPages}
-            style={{ ...navBtnStyle, opacity: pageNumber >= numPages ? 0.4 : 1, cursor: pageNumber >= numPages ? 'not-allowed' : 'pointer' }}>
-            Next →
+            style={{ ...navBtnStyle, opacity: pageNumber >= numPages ? 0.4 : 1, cursor: pageNumber >= numPages ? 'not-allowed' : 'pointer', padding: isMobile ? '6px 8px' : '7px 14px' }}>
+            {isMobile ? '→' : 'Next →'}
           </button>
+          {isMobile && (
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              style={{
+                background: 'var(--color-orange)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                padding: '6px 10px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              🧊 Models
+            </button>
+          )}
         </div>
       </div>
 
@@ -430,48 +513,16 @@ export default function BookViewer({ book }) {
           )}
         </div>
 
-        <div style={{
-          width: '280px', background: '#3B3D3F', borderLeft: '1px solid rgba(255,255,255,0.1)',
-          overflowY: 'auto', padding: '16px', flexShrink: 0,
-        }}>
-          <h3 style={{ marginTop: 0, fontSize: '15px', color: '#F5F5F5', fontWeight: '600' }}>
-            3D Models on Page {pageNumber}
-          </h3>
-          <div style={{ fontSize: '11px', color: 'rgba(245,245,245,0.5)', marginBottom: '12px' }}>
-            {pageMappings.length} annotation{pageMappings.length !== 1 ? 's' : ''}
-          </div>
-
-          {pageMappings.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <div style={{ fontSize: '28px', marginBottom: '8px', opacity: 0.3 }}>📄</div>
-              <p style={{ color: 'rgba(245,245,245,0.4)', fontSize: '12px', fontStyle: 'italic' }}>No 3D models on this page</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {pageMappings.map((m) => {
-                const model = modelMap.get(m.model_id);
-                return (
-                  <div key={m.id} style={{
-                    padding: '10px', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px',
-                    background: 'rgba(255,255,255,0.03)', transition: 'all 0.2s',
-                  }}>
-                    {model?.thumbnail && (
-                      <img src={model.thumbnail} alt={model.name}
-                        style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '4px', marginBottom: '6px' }} />
-                    )}
-                    <div style={{ fontWeight: '600', marginBottom: '2px', fontSize: '13px', color: '#F5F5F5' }}>
-                      {model?.name || m.label || `Model ${m.model_id}`}
-                    </div>
-                    <div style={{ fontSize: '10px', color: 'rgba(245,245,245,0.5)' }}>
-                      Position: ({(m.x * 100).toFixed(0)}%, {(m.y * 100).toFixed(0)}%) •
-                      Size: {(m.width * 100).toFixed(0)}%×{(m.height * 100).toFixed(0)}%
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        {isMobile ? (
+          isSidebarOpen && (
+            <>
+              <div className="mobile-drawer-overlay" onClick={() => setIsSidebarOpen(false)} style={{ zIndex: 1000 }} />
+              {renderModelsSidebar()}
+            </>
+          )
+        ) : (
+          renderModelsSidebar()
+        )}
       </div>
     </div>
   );
@@ -479,11 +530,11 @@ export default function BookViewer({ book }) {
 
 const navBtnStyle = {
   padding: '7px 14px',
-  background: '#2ecc71',
-  color: '#fff',
+  background: 'var(--color-navy)',
+  color: 'var(--color-white)',
   border: 'none',
-  borderRadius: '4px',
-  fontSize: '12px',
+  borderRadius: 'var(--radius-md)',
+  fontSize: '12.5px',
   fontWeight: '600',
-  transition: 'all 0.2s',
+  transition: 'all var(--transition-fast)',
 };

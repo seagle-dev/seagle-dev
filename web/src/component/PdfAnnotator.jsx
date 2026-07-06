@@ -4,12 +4,27 @@ import { Worker, Viewer, SpecialZoomLevel, ScrollMode } from '@react-pdf-viewer/
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/default-layout/lib/styles/index.css';
 import ConfirmationModal from './ConfirmationModal';
+import { useToast } from './Toast';
 
 const MIN_DETECTION_SIZE = 0.02;
 const RESIZE_HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
 export default function PdfAnnotator({ book, models }) {
+  const toast = useToast();
   const [pageNumber, setPageNumber] = useState(1);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setIsSidebarOpen(false);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [numPages, setNumPages] = useState(null);
   const [pdfUrl, setPdfUrl] = useState(null);
   
@@ -95,7 +110,7 @@ export default function PdfAnnotator({ book, models }) {
       setDetectedImages(images);
     } catch (err) {
       console.error('Detection failed:', err);
-      alert('Failed to detect images on this page');
+      toast.error('Failed to detect images on this page');
     } finally {
       setDetecting(false);
     }
@@ -104,7 +119,7 @@ export default function PdfAnnotator({ book, models }) {
   async function handleAssignModel(detection) {
     const modelId = assignModel || selectedModel;
     if (!modelId) {
-      alert('Please select a model first');
+      toast.warning('Please select a model first');
       return;
     }
 
@@ -468,57 +483,223 @@ export default function PdfAnnotator({ book, models }) {
     );
   }, [detectedImages, mappings, selectedDetection, beginDetectionEdit, selectDetection, handleDelete]);
 
+  const renderRightSidebar = () => (
+    <aside 
+      className={isMobile ? 'mobile-drawer-right' : ''}
+      style={isMobile ? {} : { width: '300px', background: 'var(--color-bg-white)', borderLeft: '1px solid var(--color-border)', padding: '16px', overflowY: 'auto', flexShrink: 0 }}
+    >
+      {isMobile && (
+        <button onClick={() => setIsSidebarOpen(false)} className="drawer-close-btn" aria-label="Close annotations" style={{ top: '8px', right: '8px' }}>
+          ✕
+        </button>
+      )}
+      
+      {selectedDetection && (
+        <div style={{ marginBottom: '16px', padding: '14px', background: 'var(--color-orange-bg)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-orange)', boxShadow: 'var(--shadow-sm)', marginTop: isMobile ? '32px' : '0' }}>
+          <h4 style={{ marginTop: 0, marginBottom: '8px', color: 'var(--color-navy)', fontWeight: 'bold' }}>Assign Model to Image</h4>
+          {selectedDetection.figureLabel && <p style={{ fontSize: '13px', margin: '0 0 4px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>{selectedDetection.figureLabel}</p>}
+          {selectedDetection.figureTitle && <p style={{ fontSize: '12px', margin: '0 0 8px', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>"{selectedDetection.figureTitle}"</p>}
+          <p style={{ fontSize: '11.5px', color: 'var(--color-text-muted)', margin: '0 0 10px' }}>
+            Region: ({(selectedDetection.x * 100).toFixed(0)}%, {(selectedDetection.y * 100).toFixed(0)}%)
+          </p>
+          <select value={assignModel || ''} onChange={(e) => setAssignModel(Number(e.target.value))}
+            style={{ width: '100%', padding: '6px 8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', marginBottom: '10px', color: 'var(--color-navy)', fontWeight: '600' }}>
+            {models.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
+          </select>
+          <button 
+            onClick={() => handleAssignModel(selectedDetection)}
+            className="btn-accent"
+            style={{ width: '100%', padding: '8px', marginBottom: '6px', borderRadius: 'var(--radius-md)' }}
+          >
+            ✓ Confirm & Save
+          </button>
+          <button 
+            onClick={() => { setSelectedDetection(null); setAssignModel(null); }}
+            className="btn-secondary"
+            style={{ width: '100%', padding: '6px', borderRadius: 'var(--radius-md)' }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {mode === 'manual' && annotationBox && (
+        <div style={{ marginBottom: '16px', padding: '14px', background: 'var(--color-orange-bg)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-orange)', boxShadow: 'var(--shadow-sm)', marginTop: isMobile ? '32px' : '0' }}>
+          <h4 style={{ marginTop: 0, marginBottom: '8px', color: 'var(--color-navy)', fontWeight: 'bold' }}>New Manual Annotation</h4>
+          <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '12px' }}>Size: {Math.round(annotationBox.width)} × {Math.round(annotationBox.height)}px</p>
+          <button 
+            onClick={confirmManualAnnotation}
+            className="btn-accent"
+            style={{ width: '100%', padding: '8px', marginBottom: '6px', borderRadius: 'var(--radius-md)' }}
+          >
+            ✓ Confirm Annotation
+          </button>
+          <button 
+            onClick={() => setAnnotationBox(null)}
+            className="btn-secondary"
+            style={{ width: '100%', padding: '6px', borderRadius: 'var(--radius-md)' }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {detectedImages.length > 0 && (
+        <div style={{ marginBottom: '20px', marginTop: (isMobile && !selectedDetection && !(mode === 'manual' && annotationBox)) ? '36px' : '0' }}>
+          <h4 style={{ marginTop: 0, marginBottom: '8px', color: 'var(--color-navy)', fontWeight: 'bold' }}>🖼️ Detected Images ({detectedImages.length})</h4>
+          <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '10px' }}>Click an image region on the PDF or below to assign a 3D model</p>
+          {detectedImages.map((det) => (
+            <div key={det.id}
+              onClick={() => selectDetection(det)}
+              style={{
+                padding: '10px', 
+                background: selectedDetection?.id === det.id ? 'var(--color-orange-bg)' : 'var(--color-bg-white)',
+                border: selectedDetection?.id === det.id ? '2px solid var(--color-orange)' : '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)', 
+                marginBottom: '8px', 
+                cursor: 'pointer', 
+                transition: 'all var(--transition-fast)',
+                boxShadow: 'var(--shadow-sm)'
+              }}
+              onMouseOver={(e) => {
+                if (selectedDetection?.id !== det.id) {
+                  e.currentTarget.style.borderColor = 'var(--color-text-muted)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (selectedDetection?.id !== det.id) {
+                  e.currentTarget.style.borderColor = 'var(--color-border)';
+                }
+              }}
+            >
+              <div style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--color-text-primary)' }}>{det.figureLabel || det.id}</div>
+              {det.figureTitle && <div style={{ fontSize: '11.5px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{det.figureTitle}</div>}
+              <div style={{ fontSize: '10.5px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                Position: ({(det.x * 100).toFixed(0)}%, {(det.y * 100).toFixed(0)}%)
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ marginTop: (isMobile && detectedImages.length === 0 && !selectedDetection && !(mode === 'manual' && annotationBox)) ? '36px' : '0' }}>
+        <h4 style={{ marginTop: 0, marginBottom: '12px', fontWeight: 'bold', color: 'var(--color-navy)' }}>Saved Annotations (page {pageNumber}) — {mappings.length}</h4>
+        {mappings.length === 0 ? (
+          <p style={{ color: 'var(--color-text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '16px 0', fontSize: '12px' }}>No annotations on this page</p>
+        ) : (
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {mappings.map((m) => (
+              <li key={m.id} style={{ padding: '12px', background: 'var(--color-bg-white)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ fontSize: '13.5px', fontWeight: 'bold', color: 'var(--color-text-primary)', marginBottom: '4px' }}>{m.label || `Model ${m.model_id}`}</div>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Position: ({(m.x * 100).toFixed(1)}%, {(m.y * 100).toFixed(1)}%)</div>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>Size: {(m.width * 100).toFixed(0)}% × {(m.height * 100).toFixed(0)}%</div>
+                <button 
+                  onClick={() => handleDelete(m.id)}
+                  className="btn-danger"
+                  style={{ marginTop: '10px', padding: '6px 12px', fontSize: '11.5px', borderRadius: 'var(--radius-md)' }}
+                >
+                  Delete
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </aside>
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* ... rest of the return implementation ... */}
       {/* Top Controls */}
-      <div style={{ padding: '12px 16px', background: '#f5f5f5', borderBottom: '1px solid #ddd', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-          <button onClick={goToPreviousPage} disabled={pageNumber <= 1}
-            style={{ padding: '8px 16px', background: pageNumber <= 1 ? '#ccc' : '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: pageNumber <= 1 ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
+      <div style={{ padding: '14px 24px', background: 'var(--color-bg-white)', borderBottom: '1px solid var(--color-border)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', boxShadow: 'var(--shadow-sm)', zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button 
+            onClick={goToPreviousPage} 
+            disabled={pageNumber <= 1}
+            className="btn-secondary"
+            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center' }}
+          >
             ← Previous
           </button>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontWeight: 'bold' }}>Page:</span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', color: 'var(--color-text-secondary)' }}>
+            <span style={{ fontWeight: 'bold', color: 'var(--color-navy)' }}>Page:</span>
             <input type="number" value={pageNumber}
               onChange={(e) => { const val = Number(e.target.value); if (val >= 1 && val <= (numPages || 1)) { setPageNumber(val); setAnnotationBox(null); } }}
               min={1} max={numPages || 1}
-              style={{ width: '60px', padding: '6px 8px', borderRadius: '4px', border: '1px solid #ccc', textAlign: 'center' }}
+              style={{ width: '60px', padding: '6px 8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', textAlign: 'center', fontWeight: '600' }}
             />
-            <span style={{ color: '#666' }}>of {numPages || '?'}</span>
+            <span>of {numPages || '?'}</span>
           </label>
-          <button onClick={goToNextPage} disabled={pageNumber >= numPages}
-            style={{ padding: '8px 16px', background: pageNumber >= numPages ? '#ccc' : '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: pageNumber >= numPages ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
+          <button 
+            onClick={goToNextPage} 
+            disabled={pageNumber >= numPages}
+            className="btn-secondary"
+            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center' }}
+          >
             Next →
           </button>
+          {isMobile && (
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="btn-secondary"
+              style={{ padding: '8px 12px', fontSize: '13px', border: '1px solid var(--color-orange)', color: 'var(--color-orange)', fontWeight: 'bold' }}
+            >
+              📋 Annotations
+            </button>
+          )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontWeight: 'bold' }}>Model:</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px' }}>
+            <span style={{ fontWeight: 'bold', color: 'var(--color-navy)' }}>Model:</span>
             <select value={selectedModel || ''} onChange={(e) => setSelectedModel(Number(e.target.value))}
-              style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #ccc', minWidth: '200px' }}>
+              style={{ padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', minWidth: '200px', fontWeight: '600', color: 'var(--color-navy)' }}>
               {models.map((m) => (
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
             </select>
           </label>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', border: '1px solid var(--color-border)', padding: '3px', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-primary)' }}>
             <button onClick={() => setMode('auto')}
-              style={{ padding: '6px 14px', background: mode === 'auto' ? '#28a745' : '#e0e0e0', color: mode === 'auto' ? '#fff' : '#333', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+              style={{ 
+                padding: '6px 14px', 
+                background: mode === 'auto' ? 'var(--color-navy)' : 'transparent', 
+                color: mode === 'auto' ? 'var(--color-white)' : 'var(--color-text-secondary)', 
+                border: 'none', 
+                borderRadius: 'var(--radius-sm)', 
+                cursor: 'pointer', 
+                fontWeight: 'bold',
+                fontSize: '12px'
+              }}
+            >
               🔍 Auto Detect
             </button>
             <button onClick={() => setMode('manual')}
-              style={{ padding: '6px 14px', background: mode === 'manual' ? '#007bff' : '#e0e0e0', color: mode === 'manual' ? '#fff' : '#333', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+              style={{ 
+                padding: '6px 14px', 
+                background: mode === 'manual' ? 'var(--color-navy)' : 'transparent', 
+                color: mode === 'manual' ? 'var(--color-white)' : 'var(--color-text-secondary)', 
+                border: 'none', 
+                borderRadius: 'var(--radius-sm)', 
+                cursor: 'pointer', 
+                fontWeight: 'bold',
+                fontSize: '12px'
+              }}
+            >
               ✏️ Manual Draw
             </button>
           </div>
 
           {mode === 'auto' && (
-            <button onClick={handleDetectImages} disabled={detecting}
-              style={{ padding: '6px 16px', background: detecting ? '#ccc' : '#ff9800', color: '#fff', border: 'none', borderRadius: '4px', cursor: detecting ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
-              {detecting ? '⏳ Detecting...' : '🖼️ Detect Images on Page'}
+            <button 
+              onClick={handleDetectImages} 
+              disabled={detecting}
+              className="btn-accent"
+              style={{ padding: '8px 16px', fontSize: '13.5px' }}
+            >
+              {detecting ? '⏳ Detecting...' : '🖼️ Detect Images'}
             </button>
           )}
         </div>
@@ -575,87 +756,16 @@ export default function PdfAnnotator({ book, models }) {
           )}
         </div>
 
-        <aside style={{ width: '300px', background: '#f9f9f9', borderLeft: '1px solid #ddd', padding: '16px', overflowY: 'auto', flexShrink: 0 }}>
-          {selectedDetection && (
-            <div style={{ marginBottom: '16px', padding: '12px', background: '#fff3cd', borderRadius: '6px', border: '1px solid #ffc107' }}>
-              <h4 style={{ marginTop: 0, marginBottom: '8px', color: '#856404' }}>Assign Model to Image</h4>
-              {selectedDetection.figureLabel && <p style={{ fontSize: '13px', margin: '0 0 4px', fontWeight: 'bold' }}>{selectedDetection.figureLabel}</p>}
-              {selectedDetection.figureTitle && <p style={{ fontSize: '12px', margin: '0 0 8px', color: '#666' }}>"{selectedDetection.figureTitle}"</p>}
-              <p style={{ fontSize: '11px', color: '#999', margin: '0 0 8px' }}>
-                Region: ({(selectedDetection.x * 100).toFixed(0)}%, {(selectedDetection.y * 100).toFixed(0)}%) —
-                {(selectedDetection.width * 100).toFixed(0)}% × {(selectedDetection.height * 100).toFixed(0)}%
-              </p>
-              <select value={assignModel || ''} onChange={(e) => setAssignModel(Number(e.target.value))}
-                style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #ccc', marginBottom: '8px' }}>
-                {models.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
-              </select>
-              <button onClick={() => handleAssignModel(selectedDetection)}
-                style={{ width: '100%', padding: '10px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '6px' }}>
-                ✓ Confirm & Save
-              </button>
-              <button onClick={() => { setSelectedDetection(null); setAssignModel(null); }}
-                style={{ width: '100%', padding: '8px', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-                Cancel
-              </button>
-            </div>
-          )}
-
-          {mode === 'manual' && annotationBox && (
-            <div style={{ marginBottom: '16px', padding: '12px', background: '#fff3cd', borderRadius: '6px', border: '1px solid #ffc107' }}>
-              <h4 style={{ marginTop: 0, marginBottom: '12px', color: '#856404' }}>New Manual Annotation</h4>
-              <p style={{ fontSize: '12px', color: '#666', marginBottom: '12px' }}>Size: {Math.round(annotationBox.width)} × {Math.round(annotationBox.height)}px</p>
-              <button onClick={confirmManualAnnotation}
-                style={{ width: '100%', padding: '10px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '8px' }}>
-                ✓ Confirm Annotation
-              </button>
-              <button onClick={() => setAnnotationBox(null)}
-                style={{ width: '100%', padding: '8px', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-                Cancel
-              </button>
-            </div>
-          )}
-
-          {detectedImages.length > 0 && (
-            <div style={{ marginBottom: '16px' }}>
-              <h4 style={{ marginTop: 0, marginBottom: '8px', color: '#28a745' }}>🖼️ Detected Images ({detectedImages.length})</h4>
-              <p style={{ fontSize: '11px', color: '#999', marginBottom: '8px' }}>Click an image region on the PDF or below to assign a 3D model</p>
-              {detectedImages.map((det) => (
-                <div key={det.id}
-                  onClick={() => selectDetection(det)}
-                  style={{
-                    padding: '8px', background: selectedDetection?.id === det.id ? '#fff3cd' : '#fff',
-                    border: selectedDetection?.id === det.id ? '2px solid #ffc107' : '1px solid #ddd',
-                    borderRadius: '4px', marginBottom: '6px', cursor: 'pointer', transition: 'all 0.2s',
-                  }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '13px' }}>{det.figureLabel || det.id}</div>
-                  {det.figureTitle && <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>{det.figureTitle}</div>}
-                  <div style={{ fontSize: '10px', color: '#999', marginTop: '2px' }}>
-                    ({(det.x * 100).toFixed(0)}%, {(det.y * 100).toFixed(0)}%) — {(det.width * 100).toFixed(0)}%×{(det.height * 100).toFixed(0)}%
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <h4 style={{ marginTop: 0, marginBottom: '12px' }}>Saved Annotations (page {pageNumber}) — {mappings.length}</h4>
-          {mappings.length === 0 ? (
-            <p style={{ color: '#666', fontStyle: 'italic', textAlign: 'center' }}>No annotations on this page</p>
-          ) : (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              {mappings.map((m) => (
-                <li key={m.id} style={{ padding: '10px', background: '#fff', border: '1px solid #ddd', borderRadius: '4px', marginBottom: '8px' }}>
-                  <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '4px' }}>{m.label || `Model ${m.model_id}`}</div>
-                  <div style={{ fontSize: '12px', color: '#666' }}>Position: ({(m.x * 100).toFixed(1)}%, {(m.y * 100).toFixed(1)}%)</div>
-                  <div style={{ fontSize: '11px', color: '#999' }}>Size: {(m.width * 100).toFixed(0)}% × {(m.height * 100).toFixed(0)}%</div>
-                  <button onClick={() => handleDelete(m.id)}
-                    style={{ marginTop: '8px', padding: '4px 8px', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '12px' }}>
-                    Delete
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </aside>
+        {isMobile ? (
+          isSidebarOpen && (
+            <>
+              <div className="mobile-drawer-overlay" onClick={() => setIsSidebarOpen(false)} style={{ zIndex: 1000 }} />
+              {renderRightSidebar()}
+            </>
+          )
+        ) : (
+          renderRightSidebar()
+        )}
       </div>
 
       {/* Confirmation Modal */}

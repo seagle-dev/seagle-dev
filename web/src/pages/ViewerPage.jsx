@@ -36,30 +36,72 @@ export default function ViewerPage() {
   }, []);
 
   if (loading) {
-    return <div style={{ padding: '24px' }}>Loading books...</div>;
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-sans)', fontSize: '15px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '32px', marginBottom: '8px' }}>⏳</div>
+          <div>Loading books...</div>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
-    return <div style={{ padding: '24px', color: 'red' }}>Error: {error}</div>;
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--color-error)', fontFamily: 'var(--font-sans)', padding: '24px' }}>
+        <div style={{ textAlign: 'center', background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '24px', boxShadow: 'var(--shadow-md)' }}>
+          <div style={{ fontSize: '32px', marginBottom: '8px' }}>⚠️</div>
+          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Error Loading Viewer</div>
+          <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{error}</div>
+        </div>
+      </div>
+    );
   }
 
   if (!selectedBook) {
-    return <div style={{ padding: '24px' }}>No books available</div>;
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--color-text-muted)', fontFamily: 'var(--font-sans)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '32px', marginBottom: '8px' }}>📚</div>
+          <div>No books available to view.</div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Book Selector */}
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-primary)', fontFamily: 'var(--font-sans)' }}>
+      {/* Book Selector Header */}
       {books.length > 1 && (
-        <div style={{ padding: '12px 24px', background: '#f5f5f5', borderBottom: '1px solid #ddd' }}>
-          <label style={{ marginRight: '12px', fontWeight: 'bold' }}>Select Book:</label>
+        <div style={{ 
+          padding: '12px 24px', 
+          background: 'var(--color-bg-white)', 
+          borderBottom: '1px solid var(--color-border)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '12px',
+          boxShadow: 'var(--shadow-sm)',
+          zIndex: 10
+        }}>
+          <label style={{ color: 'var(--color-navy)', fontWeight: 'bold', fontSize: '14px' }}>Active Book:</label>
           <select
             value={selectedBook.id}
             onChange={(e) => {
               const book = books.find((b) => b.id === Number(e.target.value));
               setSelectedBook(book);
             }}
-            style={{ padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: '1px solid #ccc' }}
+            style={{ 
+              width: 'auto', 
+              minWidth: '240px', 
+              padding: '6px 12px', 
+              fontSize: '13.5px', 
+              fontWeight: '600',
+              borderRadius: 'var(--radius-md)', 
+              border: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-orange-bg)',
+              color: 'var(--color-navy)',
+              cursor: 'pointer'
+            }}
           >
             {books.map((book) => (
               <option key={book.id} value={book.id}>
@@ -70,7 +112,7 @@ export default function ViewerPage() {
         </div>
       )}
 
-      {/* Book Viewer */}
+      {/* Book Viewer Container */}
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <BookViewer book={selectedBook} />
       </div>
