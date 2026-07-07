@@ -22,7 +22,7 @@ const upload = multer({
 
 // ===== Books =====
 router.get('/books', verifyToken, verifyAdmin, adminController.getBooks);
-router.post('/books', verifyToken, verifyAdmin, upload.single('pdf'), adminController.uploadBook);
+router.post('/books', verifyToken, upload.single('pdf'), adminController.uploadBook);
 router.get('/books/:id/pdf', verifyToken, adminController.getBookPdf);       // Stream PDF
 router.get('/books/:id/cover', adminController.getBookCover);                 // Stream cover (public, for thumbnails)
 router.get('/books/:id/detect-images', verifyToken, verifyAdmin, adminController.detectImages);  // <-- ADD THIS
