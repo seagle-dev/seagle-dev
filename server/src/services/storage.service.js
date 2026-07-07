@@ -1,29 +1,26 @@
-// server/src/services/storage.service.js
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
-const { supabase, bucketName } = require('../config/supabase');
+const { randomUUID } = require('crypto');
+const db = require('../config/db');
+const { Readable } = require('stream');
 
 /**
- * Upload a buffer to Supabase Storage and return the file path.
+ * Upload a buffer to MySQL Storage and return the file path.
  * @param {Buffer} buffer - File content
  * @param {string} destPath - Path in bucket, e.g. 'books/pdf/abc.pdf'
  * @param {string} contentType - MIME type
- * @returns {Promise<string>} The file path (e.g. 'books/pdf/abc.pdf')
+ * @returns {Promise<string>} The file path
  */
 async function uploadBuffer(buffer, destPath, contentType) {
   try {
-    const { data, error } = await supabase.storage
-      .from(bucketName)
-      .upload(destPath, buffer, {
-        contentType,
-        upsert: false,
-      });
-
-    if (error) {
-      throw new Error(`Supabase upload error: ${error.message}`);
-    }
-
-    console.log('Uploaded to Supabase:', destPath);
+    const query = `
+      INSERT INTO file_storage (file_path, content_type, file_data) 
+      VALUES ($1, $2, $3) 
+      ON DUPLICATE KEY UPDATE 
+        content_type = VALUES(content_type), 
+        file_data = VALUES(file_data)
+    `;
+    await db.query(query, [destPath, contentType, buffer]);
+    console.log('Uploaded to MySQL file_storage:', destPath);
     return destPath;
   } catch (err) {
     console.error('uploadBuffer error:', err.message);
@@ -32,37 +29,28 @@ async function uploadBuffer(buffer, destPath, contentType) {
 }
 
 /**
- * Upload a multer file to Supabase Storage.
+ * Upload a multer file to MySQL Storage.
  * @param {object} file - Multer file with .buffer, .originalname, .mimetype
  * @param {string} folder - Destination folder, e.g. 'books/pdf'
  * @returns {Promise<string>} The file path
  */
 async function uploadFile(file, folder) {
   const ext = path.extname(file.originalname).toLowerCase();
-  const filename = `${uuidv4()}${ext}`;
+  const filename = `${randomUUID()}${ext}`;
   const destPath = `${folder}/${filename}`;
   return uploadBuffer(file.buffer, destPath, file.mimetype);
 }
 
 /**
- * Download a file from Supabase and return its contents as a Buffer.
+ * Download a file from MySQL and return its contents as a Buffer.
  */
 async function getFileBuffer(filePath) {
   if (!filePath) return null;
 
   try {
-    const { data, error } = await supabase.storage
-      .from(bucketName)
-      .download(filePath);
-
-    if (error) {
-      console.error('getFileBuffer error for', filePath, ':', error.message);
-      return null;
-    }
-
-    // Convert Blob to Buffer
-    const arrayBuffer = await data.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    const { rows } = await db.query('SELECT file_data FROM file_storage WHERE file_path = $1', [filePath]);
+    if (!rows || rows.length === 0) return null;
+    return rows[0].file_data;
   } catch (err) {
     console.error('getFileBuffer error for', filePath, ':', err.message);
     return null;
@@ -70,29 +58,31 @@ async function getFileBuffer(filePath) {
 }
 
 /**
- * Stream a file from Supabase.
- * @param {string} filePath - The file path in Supabase (e.g. 'books/pdf/abc.pdf')
+ * Stream a file from MySQL.
+ * @param {string} filePath - The file path (e.g. 'books/pdf/abc.pdf')
  * @returns {{ stream: ReadableStream, contentType, size }} The readable stream and metadata
  */
 async function getFileStream(filePath) {
+  if (!filePath) return null;
+
   try {
-    const { data, error } = await supabase.storage
-      .from(bucketName)
-      .download(filePath);
+    const { rows } = await db.query('SELECT file_data, content_type FROM file_storage WHERE file_path = $1', [filePath]);
+    if (!rows || rows.length === 0) return null;
 
-    if (error) {
-      console.error('getFileStream error for', filePath, ':', error.message);
-      return null;
-    }
+    const buffer = rows[0].file_data;
 
-    // Create a readable stream from the blob
-    const { Readable } = require('stream');
-    const stream = Readable.from(data.stream());
+    // Create a readable stream from the buffer
+    const stream = new Readable({
+      read() {
+        this.push(buffer);
+        this.push(null);
+      }
+    });
 
     return {
       stream,
-      contentType: data.type || 'application/octet-stream',
-      size: data.size,
+      contentType: rows[0].content_type || 'application/octet-stream',
+      size: buffer.length,
     };
   } catch (err) {
     console.error('getFileStream error for', filePath, ':', err.message);
@@ -101,23 +91,15 @@ async function getFileStream(filePath) {
 }
 
 /**
- * Delete a file from Supabase Storage by its path.
+ * Delete a file from MySQL Storage by its path.
  * @param {string} filePath - The file path (e.g. 'books/pdf/abc.pdf')
  */
 async function deleteFileByPath(filePath) {
   if (!filePath) return;
 
   try {
-    const { error } = await supabase.storage
-      .from(bucketName)
-      .remove([filePath]);
-
-    if (error) {
-      console.warn('Failed to delete from Supabase:', error.message);
-      return;
-    }
-
-    console.log('Deleted from Supabase:', filePath);
+    await db.query('DELETE FROM file_storage WHERE file_path = $1', [filePath]);
+    console.log('Deleted from MySQL file_storage:', filePath);
   } catch (err) {
     console.warn('Failed to delete from storage:', err.message);
   }

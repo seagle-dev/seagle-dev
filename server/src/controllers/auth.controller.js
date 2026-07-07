@@ -3,6 +3,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const admin = require('../config/firebase');
 const { Resend } = require('resend');
+const { isValidEmail, isValidPassword } = require('../utils/validation');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
@@ -11,6 +12,8 @@ exports.register = async (req, res) => {
   const { email, password, firstName, lastName } = req.body;
   console.log('Register called with email:', email);
   if (!email || !password) return res.status(400).json({ message: "Email and password required" });
+  if (!isValidEmail(email)) return res.status(400).json({ message: "Invalid email format" });
+  if (!isValidPassword(password)) return res.status(400).json({ message: "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number" });
 
   try {
     const hash = await bcrypt.hash(password, 10);

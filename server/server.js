@@ -1,4 +1,16 @@
 require('dotenv').config({ override: true });
+
+process.on('uncaughtException', (err) => {
+  console.error('DEBUG: UNCAUGHT EXCEPTION:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('DEBUG: UNHANDLED REJECTION:', reason);
+});
+process.on('exit', (code) => {
+  console.log(`DEBUG: PROCESS EXITED WITH CODE: ${code}`);
+  console.trace('DEBUG: Exit stack trace');
+});
+
 const app = require('./src/app');
 const db = require('./src/config/db');
 

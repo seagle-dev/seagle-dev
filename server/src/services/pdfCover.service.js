@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 /**
  * Render the first page of a PDF buffer to a PNG buffer.
@@ -14,7 +14,7 @@ async function generateCoverFromPdf(pdfBuffer, dpi = 300) {
   console.log('[pdfCover] START - buffer size:', pdfBuffer?.length, 'bytes, DPI:', dpi);
 
   const tempDir = os.tmpdir();
-  const tempId = uuidv4();
+  const tempId = randomUUID();
   const tempPdfPath = path.join(tempDir, `seagle_cover_${tempId}.pdf`);
   const outputPrefix = path.join(tempDir, `seagle_cover_${tempId}`);
 

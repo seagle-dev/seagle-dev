@@ -144,7 +144,17 @@ export default function Auth() {
           <Text style={styles.link}>Terms of Use</Text> and <Text style={styles.link}>Privacy Policy</Text>.
         </Text>
 
-        <TouchableOpacity style={styles.adminLink}>
+        <TouchableOpacity 
+          style={styles.adminLink}
+          onPress={() => {
+            const adminUrl = Platform.OS === 'android' ? 'http://10.0.2.2:5173/admin' : 'http://localhost:5173/admin';
+            import('react-native').then(({ Linking }) => {
+              Linking.openURL(adminUrl).catch(() => {
+                Alert.alert('Error', 'Unable to open the web admin portal. Please ensure the web server is running on port 5173.');
+              });
+            });
+          }}
+        >
           <Text style={styles.adminText}>Sign in as Admin</Text>
         </TouchableOpacity>
       </ScrollView>
