@@ -69,9 +69,34 @@ app.use('/api/library', libraryRoutes);
 app.use('/api/home', homeRoutes);
 
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Enhanced Health check
+app.get('/api/health', async (req, res) => {
+  const db = require('./config/db');
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    services: {
+      database: false
+    },
+    memory: {
+      rss: `${Math.round(process.memoryUsage().rss / 1024 / 1024)} MB`,
+      heapTotal: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)} MB`,
+      heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`
+    }
+  };
+
+  try {
+    // Simple fast check query
+    await db.query('SELECT 1');
+    health.services.database = true;
+  } catch (error) {
+    health.status = 'degraded';
+    health.error = error.message;
+  }
+
+  const statusCode = health.status === 'ok' ? 200 : 500;
+  res.status(statusCode).json(health);
 });
 
 // Test endpoint to verify database connection (moved from server.js)
