@@ -23,8 +23,7 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
     "mysql2": "^3.22.5",
-    "pdf-poppler": "^0.2.3",
-    "pdfjs-dist": "^5.4.624",
+    "pdfjs-dist": "4.0.379",
     "pg": "^8.11.3",
     "resend": "^6.12.3",
     "uuid": "^13.0.0"

@@ -1,98 +1,155 @@
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const { randomUUID } = require('crypto');
+const {
+  createCanvas,
+  DOMMatrix,
+  ImageData,
+} = require('canvas');
+
+const PDFJS_RENDERER = 'pdfjs-dist/legacy/build/pdf.mjs';
+const DEFAULT_DPI = 300;
+const PDF_POINTS_PER_INCH = 72;
+const MAX_CANVAS_PIXELS = 20_000_000;
+
+let pdfjsPromise;
+
+function ensurePdfJsPolyfills() {
+  if (typeof globalThis.DOMMatrix === 'undefined' && DOMMatrix) {
+    globalThis.DOMMatrix = DOMMatrix;
+  }
+
+  if (typeof globalThis.ImageData === 'undefined' && ImageData) {
+    globalThis.ImageData = ImageData;
+  }
+}
+
+async function loadPdfJs() {
+  if (!pdfjsPromise) {
+    ensurePdfJsPolyfills();
+    pdfjsPromise = import(PDFJS_RENDERER);
+  }
+
+  return pdfjsPromise;
+}
+
+class NodeCanvasFactory {
+  create(width, height) {
+    if (width <= 0 || height <= 0) {
+      throw new Error(`Invalid canvas size: ${width}x${height}`);
+    }
+
+    const canvas = createCanvas(width, height);
+    const context = canvas.getContext('2d');
+    return { canvas, context };
+  }
+
+  reset(canvasAndContext, width, height) {
+    if (!canvasAndContext.canvas) {
+      throw new Error('Canvas is not specified');
+    }
+
+    if (width <= 0 || height <= 0) {
+      throw new Error(`Invalid canvas size: ${width}x${height}`);
+    }
+
+    canvasAndContext.canvas.width = width;
+    canvasAndContext.canvas.height = height;
+  }
+
+  destroy(canvasAndContext) {
+    if (!canvasAndContext.canvas) return;
+
+    canvasAndContext.canvas.width = 0;
+    canvasAndContext.canvas.height = 0;
+    canvasAndContext.canvas = null;
+    canvasAndContext.context = null;
+  }
+}
+
+function calculateRenderScale(viewport, dpi) {
+  const requestedScale = dpi / PDF_POINTS_PER_INCH;
+  const requestedPixels = viewport.width * requestedScale * viewport.height * requestedScale;
+
+  if (requestedPixels <= MAX_CANVAS_PIXELS) {
+    return requestedScale;
+  }
+
+  return Math.sqrt(MAX_CANVAS_PIXELS / (viewport.width * viewport.height));
+}
 
 /**
  * Render the first page of a PDF buffer to a PNG buffer.
- * Uses pdf-poppler (native Poppler engine).
+ * Uses pdfjs-dist and node-canvas, avoiding Poppler binaries and temp files.
  * @param {Buffer} pdfBuffer - The raw PDF file content
  * @param {number} dpi - Render DPI (default 300 for good quality)
  * @returns {Promise<Buffer>} PNG image buffer
  */
-async function generateCoverFromPdf(pdfBuffer, dpi = 300) {
-  console.log('[pdfCover] START - buffer size:', pdfBuffer?.length, 'bytes, DPI:', dpi);
+async function generateCoverFromPdf(pdfBuffer, dpi = DEFAULT_DPI) {
+  if (!Buffer.isBuffer(pdfBuffer) || pdfBuffer.length === 0) {
+    throw new Error('PDF buffer is required to generate a cover');
+  }
 
-  const tempDir = os.tmpdir();
-  const tempId = randomUUID();
-  const tempPdfPath = path.join(tempDir, `seagle_cover_${tempId}.pdf`);
-  const outputPrefix = path.join(tempDir, `seagle_cover_${tempId}`);
+  const targetDpi = Number.isFinite(dpi) && dpi > 0 ? dpi : DEFAULT_DPI;
+  console.log('[pdfCover] START - buffer size:', pdfBuffer.length, 'bytes, DPI:', targetDpi);
+
+  let pdf;
+  let canvasAndContext;
+  const canvasFactory = new NodeCanvasFactory();
 
   try {
-    // 1. Write PDF buffer to temp file
-    fs.writeFileSync(tempPdfPath, pdfBuffer);
-    console.log('[pdfCover] Temp PDF written to:', tempPdfPath);
+    const { getDocument } = await loadPdfJs();
+    const loadingTask = getDocument({
+      data: new Uint8Array(pdfBuffer.buffer, pdfBuffer.byteOffset, pdfBuffer.byteLength),
+      disableWorker: true,
+      useSystemFonts: true,
+    });
 
-    // 2. Convert page 1 to PNG using pdf-poppler
-    const poppler = require('pdf-poppler');
+    pdf = await loadingTask.promise;
 
-    const opts = {
-      format: 'png',
-      out_dir: tempDir,
-      out_prefix: `seagle_cover_${tempId}`,
-      page: 1,
-      scale: dpi,    // DPI: 300 = good quality, 600 = high quality
-    };
-
-    console.log('[pdfCover] Converting page 1 with pdf-poppler (DPI:', dpi, ')...');
-    await poppler.convert(tempPdfPath, opts);
-    console.log('[pdfCover] pdf-poppler conversion done');
-
-    // 3. Find the output PNG file
-    const expectedOutputPath = `${outputPrefix}-1.png`;
-
-    let pngPath;
-    if (fs.existsSync(expectedOutputPath)) {
-      pngPath = expectedOutputPath;
-    } else {
-      const files = fs.readdirSync(tempDir).filter(f =>
-        f.startsWith(`seagle_cover_${tempId}`) && f.endsWith('.png')
-      );
-      console.log('[pdfCover] Looking for output PNG. Found files:', files);
-      if (files.length === 0) {
-        throw new Error('pdf-poppler produced no output PNG');
-      }
-      pngPath = path.join(tempDir, files[0]);
+    if (!pdf.numPages) {
+      throw new Error('PDF has no pages');
     }
 
-    // 4. Read the output PNG
-    const pngBuffer = fs.readFileSync(pngPath);
-    console.log('[pdfCover] ✅ PNG buffer created. Size:', pngBuffer.length, 'bytes');
+    const page = await pdf.getPage(1);
+    const baseViewport = page.getViewport({ scale: 1 });
+    const scale = calculateRenderScale(baseViewport, targetDpi);
+    const viewport = page.getViewport({ scale });
+    const width = Math.max(1, Math.round(viewport.width));
+    const height = Math.max(1, Math.round(viewport.height));
 
-    // 5. Log image dimensions for debugging
-    // PNG header: bytes 16-19 = width, bytes 20-23 = height (big endian)
-    if (pngBuffer.length > 24) {
-      const width = pngBuffer.readUInt32BE(16);
-      const height = pngBuffer.readUInt32BE(20);
-      console.log('[pdfCover] ✅ Image dimensions:', width, 'x', height, 'pixels');
+    console.log('[pdfCover] Rendering page 1 at', width, 'x', height, 'pixels');
+
+    canvasAndContext = canvasFactory.create(width, height);
+    canvasAndContext.context.fillStyle = '#ffffff';
+    canvasAndContext.context.fillRect(0, 0, width, height);
+
+    await page.render({
+      canvasContext: canvasAndContext.context,
+      viewport,
+      canvasFactory,
+      background: 'white',
+    }).promise;
+
+    const pngBuffer = canvasAndContext.canvas.toBuffer('image/png');
+    if (!pngBuffer || pngBuffer.length === 0) {
+      throw new Error('PDF cover rendering produced an empty PNG');
     }
 
-    // 6. Clean up temp files
-    safeDelete(pngPath);
-    safeDelete(tempPdfPath);
-
+    console.log('[pdfCover] PNG buffer created. Size:', pngBuffer.length, 'bytes');
     return pngBuffer;
   } catch (err) {
-    safeDelete(tempPdfPath);
-    try {
-      const files = fs.readdirSync(tempDir).filter(f =>
-        f.startsWith(`seagle_cover_${tempId}`)
-      );
-      files.forEach(f => safeDelete(path.join(tempDir, f)));
-    } catch (e) { /* ignore */ }
-
-    console.error('[pdfCover] ❌ Error:', err.message);
-    throw err;
-  }
-}
-
-function safeDelete(filePath) {
-  try {
-    if (filePath && fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    console.error('[pdfCover] Error generating PDF cover:', err.message);
+    throw new Error(`Failed to generate PDF cover: ${err.message}`);
+  } finally {
+    if (canvasAndContext) {
+      canvasFactory.destroy(canvasAndContext);
     }
-  } catch (e) {
-    console.warn('[pdfCover] Failed to delete temp file:', filePath, e.message);
+
+    if (pdf) {
+      try {
+        await pdf.destroy();
+      } catch (err) {
+        console.warn('[pdfCover] Failed to destroy PDF document:', err.message);
+      }
+    }
   }
 }
 
