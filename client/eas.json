@@ -8,12 +8,12 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://seagle-dev-production.up.railway.app/api"
+        "EXPO_PUBLIC_API_BASE_URL": "https://seagle-dev.onrender.com/api"
       }
     },
     "preview": {
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://seagle-dev-production.up.railway.app/api"
+        "EXPO_PUBLIC_API_BASE_URL": "https://seagle-dev.onrender.com/api"
       },
       "android": {
         "buildType": "apk"
@@ -25,7 +25,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://seagle-dev-production.up.railway.app/api"
+        "EXPO_PUBLIC_API_BASE_URL": "https://seagle-dev.onrender.com/api"
       }
     }
   },
