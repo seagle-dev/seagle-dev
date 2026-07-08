@@ -1,6 +1,7 @@
 const {
   createCanvas,
   DOMMatrix,
+  Image,
   ImageData,
 } = require('canvas');
 
@@ -12,12 +13,34 @@ const MAX_CANVAS_PIXELS = 20_000_000;
 let pdfjsPromise;
 
 function ensurePdfJsPolyfills() {
+  disableBrowserImageApi('createImageBitmap');
+  disableBrowserImageApi('OffscreenCanvas');
+  disableBrowserImageApi('ImageDecoder');
+
   if (typeof globalThis.DOMMatrix === 'undefined' && DOMMatrix) {
     globalThis.DOMMatrix = DOMMatrix;
   }
 
   if (typeof globalThis.ImageData === 'undefined' && ImageData) {
     globalThis.ImageData = ImageData;
+  }
+
+  if (typeof globalThis.Image === 'undefined' && Image) {
+    globalThis.Image = Image;
+  }
+}
+
+function disableBrowserImageApi(name) {
+  if (typeof globalThis[name] === 'undefined') return;
+
+  try {
+    Object.defineProperty(globalThis, name, {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+  } catch (err) {
+    console.warn(`[pdfCover] Could not disable ${name}:`, err.message);
   }
 }
 
@@ -99,6 +122,9 @@ async function generateCoverFromPdf(pdfBuffer, dpi = DEFAULT_DPI) {
     const loadingTask = getDocument({
       data: new Uint8Array(pdfBuffer.buffer, pdfBuffer.byteOffset, pdfBuffer.byteLength),
       disableWorker: true,
+      isImageDecoderSupported: false,
+      isOffscreenCanvasSupported: false,
+      canvasMaxAreaInBytes: MAX_CANVAS_PIXELS * 4,
       useSystemFonts: true,
     });
 
