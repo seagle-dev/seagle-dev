@@ -1,9 +1,13 @@
+const { createRequire } = require('module');
+
+const canvasBackend = loadCanvasBackend();
 const {
   createCanvas,
   DOMMatrix,
   Image,
   ImageData,
-} = require('canvas');
+  Path2D,
+} = canvasBackend;
 
 const PDFJS_RENDERER = 'pdfjs-dist/legacy/build/pdf.mjs';
 const DEFAULT_DPI = 300;
@@ -11,6 +15,20 @@ const PDF_POINTS_PER_INCH = 72;
 const MAX_CANVAS_PIXELS = 20_000_000;
 
 let pdfjsPromise;
+
+function loadCanvasBackend() {
+  try {
+    const requireFromPdfJs = createRequire(require.resolve('pdfjs-dist/package.json'));
+    const backend = requireFromPdfJs('canvas');
+    console.log('[pdfCover] Using pdfjs canvas backend:', requireFromPdfJs.resolve('canvas'), backend.version || 'unknown');
+    return backend;
+  } catch (err) {
+    console.warn('[pdfCover] pdfjs-dist canvas backend unavailable, using app canvas backend:', err.message);
+    const backend = require('canvas');
+    console.log('[pdfCover] Using app canvas backend:', require.resolve('canvas'), backend.version || 'unknown');
+    return backend;
+  }
+}
 
 function ensurePdfJsPolyfills() {
   disableBrowserImageApi('createImageBitmap');
@@ -27,6 +45,10 @@ function ensurePdfJsPolyfills() {
 
   if (typeof globalThis.Image === 'undefined' && Image) {
     globalThis.Image = Image;
+  }
+
+  if (typeof globalThis.Path2D === 'undefined' && Path2D) {
+    globalThis.Path2D = Path2D;
   }
 }
 

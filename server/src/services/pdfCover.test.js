@@ -15,6 +15,8 @@ jest.mock('canvas', () => ({
   createCanvas: mockCreateCanvas,
   DOMMatrix: class DOMMatrix {},
   ImageData: class ImageData {},
+  Image: class Image {},
+  Path2D: class Path2D {},
 }));
 
 describe('pdfCover.service', () => {
