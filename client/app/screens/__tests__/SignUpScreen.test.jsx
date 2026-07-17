@@ -17,10 +17,10 @@ describe('SignUpScreen', () => {
     jest.clearAllMocks();
     mockPush = jest.fn();
     useRouter.mockImplementation(() => ({ push: mockPush }));
-    
+
     mockSignIn = jest.fn();
     useAuth.mockReturnValue({ signIn: mockSignIn });
-    
+
     jest.spyOn(Alert, 'alert');
   });
 
@@ -40,28 +40,28 @@ describe('SignUpScreen', () => {
     await render(<SignUpScreen />);
     fireEvent.changeText(screen.getByPlaceholderText('Enter Email'), 'test@test.com');
     const passwords = screen.getAllByPlaceholderText('************');
-    fireEvent.changeText(passwords[0], 'password123'); // Password
-    fireEvent.changeText(passwords[1], 'password124'); // Confirm Password
-    
+    fireEvent.changeText(passwords[0], 'Password123!'); // Password
+    fireEvent.changeText(passwords[1], 'Password124!'); // Confirm Password
+
     fireEvent.press(screen.getByText('Create Account'));
     expect(Alert.alert).toHaveBeenCalledWith('Error', 'Passwords do not match');
   });
 
   it('calls register and navigates on success', async () => {
     register.mockResolvedValueOnce({ user: { id: 1 }, token: 'token123' });
-    
+
     await render(<SignUpScreen />);
     fireEvent.changeText(screen.getByPlaceholderText('Enter First Name'), 'John');
     fireEvent.changeText(screen.getByPlaceholderText('Enter Last Name'), 'Doe');
     fireEvent.changeText(screen.getByPlaceholderText('Enter Email'), 'test@test.com');
     const passwords = screen.getAllByPlaceholderText('************');
-    fireEvent.changeText(passwords[0], 'password123');
-    fireEvent.changeText(passwords[1], 'password123');
-    
+    fireEvent.changeText(passwords[0], 'Password123!');
+    fireEvent.changeText(passwords[1], 'Password123!');
+
     fireEvent.press(screen.getByText('Create Account'));
 
     await waitFor(() => {
-      expect(register).toHaveBeenCalledWith('test@test.com', 'password123', 'John', 'Doe');
+      expect(register).toHaveBeenCalledWith('test@test.com', 'Password123!', 'John', 'Doe');
       expect(mockSignIn).toHaveBeenCalledWith({ id: 1 }, 'token123');
       expect(mockPush).toHaveBeenCalledWith('/screens/SuccessScreen');
     });
@@ -69,17 +69,42 @@ describe('SignUpScreen', () => {
 
   it('shows error alert on registration failure', async () => {
     register.mockRejectedValueOnce(new Error('Email already taken'));
-    
+
     await render(<SignUpScreen />);
     fireEvent.changeText(screen.getByPlaceholderText('Enter Email'), 'test@test.com');
     const passwords = screen.getAllByPlaceholderText('************');
-    fireEvent.changeText(passwords[0], 'password123');
-    fireEvent.changeText(passwords[1], 'password123');
-    
+    fireEvent.changeText(passwords[0], 'Password123!');
+    fireEvent.changeText(passwords[1], 'Password123!');
+
     fireEvent.press(screen.getByText('Create Account'));
 
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith('Registration Failed', 'Email already taken');
     });
+  });
+
+  it('shows error if email format is invalid', async () => {
+    await render(<SignUpScreen />);
+    fireEvent.changeText(screen.getByPlaceholderText('Enter Email'), 'invalid-email');
+    const passwords = screen.getAllByPlaceholderText('************');
+    fireEvent.changeText(passwords[0], 'Password123!');
+    fireEvent.changeText(passwords[1], 'Password123!');
+    
+    fireEvent.press(screen.getByText('Create Account'));
+    expect(Alert.alert).toHaveBeenCalledWith('Error', 'Invalid email format');
+  });
+
+  it('shows error if password does not meet complexity requirements', async () => {
+    await render(<SignUpScreen />);
+    fireEvent.changeText(screen.getByPlaceholderText('Enter Email'), 'test@test.com');
+    const passwords = screen.getAllByPlaceholderText('************');
+    fireEvent.changeText(passwords[0], 'Password123'); // Missing special character
+    fireEvent.changeText(passwords[1], 'Password123');
+    
+    fireEvent.press(screen.getByText('Create Account'));
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Error',
+      'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+    );
   });
 });

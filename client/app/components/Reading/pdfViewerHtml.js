@@ -295,6 +295,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
     // ---- State ----
     let pdfDoc = null;
     let totalPages = 0;
+    let drawingColor = '#FF3B30';
     let lastReportedPage = null;
     let currentAnnotationsMap = new Map(); // pageNum -> annotations[]
     const pageAnnotationSignatures = new Map();
@@ -1059,11 +1060,11 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         ctx.moveTo(pos.x, pos.y);
         
         if (activeTool === 'pen') {
-          ctx.strokeStyle = '#F5F5F5';
+          ctx.strokeStyle = drawingColor;
           ctx.lineWidth = 3;
           ctx.globalCompositeOperation = 'source-over';
         } else if (activeTool === 'highlighter') {
-          ctx.strokeStyle = 'rgba(255, 193, 7, 0.16)';
+          ctx.strokeStyle = drawingColor + '29'; // ~16% opacity
           ctx.lineWidth = 16;
           ctx.globalCompositeOperation = 'source-over';
         } else if (activeTool === 'eraser') {
@@ -1142,7 +1143,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
             x: pos.relX,
             y: pos.relY,
             size: 16,
-            color: '#F5F5F5'
+            color: drawingColor
           });
           renderDrawing(pageNum);
         }
@@ -1197,7 +1198,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
           ctx.stroke();
         } else if (item.type === 'text') {
           ctx.globalCompositeOperation = 'source-over';
-          ctx.fillStyle = '#F5F5F5';
+          ctx.fillStyle = item.color || '#F5F5F5';
           ctx.font = getTextFont(getTextSize(item));
           ctx.fillText(item.text, item.x * canvas.width, item.y * canvas.height);
         }
@@ -1293,6 +1294,8 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
           activeTool = data.tool;
           ensureDrawingCanvasesForActiveTool();
           sendMessage({ type: 'toolChanged', tool: activeTool });
+        } else if (data.type === 'setColor') {
+          drawingColor = data.color;
         } else if (data.type === 'undo') {
           undo();
         } else if (data.type === 'redo') {
