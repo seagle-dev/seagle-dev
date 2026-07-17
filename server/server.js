@@ -6,7 +6,7 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('DEBUG: UNHANDLED REJECTION:', reason);
 });
-process.on('exit', (code) => {
+process.on('exit', (code) => { 
   console.log(`DEBUG: PROCESS EXITED WITH CODE: ${code}`);
   console.trace('DEBUG: Exit stack trace');
 });

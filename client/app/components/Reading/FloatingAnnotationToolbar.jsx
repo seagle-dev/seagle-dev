@@ -36,8 +36,11 @@ export default function FloatingAnnotationToolbar({
   onRedo,
   onClear,
   onCancel,
+  activeColor = '#FF3B30',
+  onSelectColor,
 }) {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const COLORS_LIST = ['#FF3B30', '#007AFF', '#34C759', '#FFCC00', '#000000', '#FFFFFF'];
   
   const startOffset = useMemo(
     () => ({
@@ -157,6 +160,24 @@ export default function FloatingAnnotationToolbar({
     };
   };
 
+  const getColorStyle = (index) => {
+    // Spread colors evenly across a concentric half-moon arc.
+    const angleStep = 0.45; 
+    const angle = side === 'right' 
+      ? (Math.PI * 1.5) - (index * angleStep) 
+      : (Math.PI * 1.5) + (index * angleStep); 
+    
+    const radius = 62;
+    
+    return {
+      transform: [
+        { translateX: Math.cos(angle) * radius },
+        { translateY: Math.sin(angle) * radius }
+      ],
+      position: 'absolute',
+    };
+  };
+
   const renderMainIcon = () => {
     if (expanded) {
       return <Ionicons name="close" size={26} color={COLORS.white} />;
@@ -186,6 +207,29 @@ export default function FloatingAnnotationToolbar({
         ]}
         pointerEvents="box-none"
       >
+        {/* Color Palette (Visible when pen/highlighter/text is active and toolbar is collapsed) */}
+        {activeTool && (activeTool === 'pen' || activeTool === 'highlighter' || activeTool === 'text') && !expanded && (
+          <View style={styles.colorCluster} pointerEvents="box-none">
+            {COLORS_LIST.map((color, index) => (
+              <Animated.View
+                key={color}
+                style={[styles.colorDotWrapper, getColorStyle(index)]}
+                pointerEvents="auto"
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.colorDot,
+                    { backgroundColor: color },
+                    activeColor === color && styles.activeColorDot,
+                  ]}
+                  onPress={() => onSelectColor?.(color)}
+                  activeOpacity={0.7}
+                />
+              </Animated.View>
+            ))}
+          </View>
+        )}
+
         {/* Expanded Tools */}
         <View style={styles.toolCluster} pointerEvents="box-none">
           {TOOLS.map((tool, index) => (
@@ -313,5 +357,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     borderRadius: 4,
     overflow: 'hidden',
+  },
+  colorCluster: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: BUTTON_SIZE,
+    height: BUTTON_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  colorDotWrapper: {
+    position: 'absolute',
+    alignItems: 'center',
+  },
+  colorDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#E6DFF3',
+    ...SHADOWS.small,
+  },
+  activeColorDot: {
+    borderColor: COLORS.orange || '#FF8C42',
+    transform: [{ scale: 1.25 }],
+    borderWidth: 2,
   },
 });

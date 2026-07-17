@@ -30,6 +30,7 @@ const PdfViewer = memo(forwardRef(function PdfViewer({
   modelContextMap = {},
   modelContextVersion = 0,
   activeTool,
+  activeColor = '#FF3B30',
   onUndoRequest,
   onClearRequest,
   onDirty,
@@ -65,6 +66,12 @@ const PdfViewer = memo(forwardRef(function PdfViewer({
     if (!viewerReady) return;
     postToViewer({ type: 'setTool', tool: activeTool });
   }, [activeTool, postToViewer, viewerReady]);
+
+  // Send color changes to WebView
+  useEffect(() => {
+    if (!viewerReady) return;
+    postToViewer({ type: 'setColor', color: activeColor });
+  }, [activeColor, postToViewer, viewerReady]);
 
   // Handle actions
   useEffect(() => {

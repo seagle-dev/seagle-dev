@@ -36,31 +36,55 @@ export default function SignUpScreen() {
       Alert.alert('Error', 'Email and password are required')
       return
     }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      Alert.alert('Error', 'Invalid email format')
+      return
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
+    if (!passwordRegex.test(password)) {
+      Alert.alert(
+        'Error',
+        'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+      )
+      return
+    }
+
     if (password !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match')
       return
     }
 
     setIsLoading(true)
+    console.log('[SignUp] Attempting registration for:', email)
     try {
       const data = await register(email, password, firstName, lastName)
+      console.log('[SignUp] Registration success:', data)
       await signIn(data.user, data.token)
       setIsLoading(false)
       router.push('/screens/SuccessScreen')
     } catch (err) {
       setIsLoading(false)
-      Alert.alert('Registration Failed', err.message || 'Could not create account')
+      const errorMsg = err.response?.data?.message || err.message || 'Could not create account'
+      console.error('[SignUp] Registration failed:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message,
+      })
+      Alert.alert('Registration Failed', errorMsg)
     }
   }
 
   const navigateToLogin = () => {
     router.push('/')
   }
-  
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

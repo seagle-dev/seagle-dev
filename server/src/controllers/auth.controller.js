@@ -11,9 +11,18 @@ const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 exports.register = async (req, res) => {
   const { email, password, firstName, lastName } = req.body;
   console.log('Register called with email:', email);
-  if (!email || !password) return res.status(400).json({ message: "Email and password required" });
-  if (!isValidEmail(email)) return res.status(400).json({ message: "Invalid email format" });
-  if (!isValidPassword(password)) return res.status(400).json({ message: "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number" });
+  if (!email || !password) {
+    console.error('Validation failed: Email or password missing. Email:', !!email, 'Password:', !!password);
+    return res.status(400).json({ message: "Email and password required" });
+  }
+  if (!isValidEmail(email)) {
+    console.error('Validation failed: Invalid email format:', email);
+    return res.status(400).json({ message: "Invalid email format" });
+  }
+  if (!isValidPassword(password)) {
+    console.error('Validation failed: Invalid password format. Length:', password?.length, 'Has Upper:', /[A-Z]/.test(password), 'Has Lower:', /[a-z]/.test(password), 'Has Digit:', /\d/.test(password), 'Has Special:', /[^A-Za-z0-9]/.test(password));
+    return res.status(400).json({ message: "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character" });
+  }
 
   try {
     const hash = await bcrypt.hash(password, 10);

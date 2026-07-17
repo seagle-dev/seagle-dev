@@ -59,6 +59,7 @@ export default function ReadingTab({ book }) {
 
   // Annotation Tool State
   const [activeTool, setActiveTool] = useState(null);
+  const [activeColor, setActiveColor] = useState('#FF3B30');
   const [isToolbarExpanded, setIsToolbarExpanded] = useState(false);
   const [undoTrigger, setUndoTrigger] = useState(0);
   const [clearTrigger, setClearTrigger] = useState(0);
@@ -376,6 +377,7 @@ export default function ReadingTab({ book }) {
           modelContextMap={modelContextMap}
           modelContextVersion={modelContextVersion}
           activeTool={activeTool}
+          activeColor={activeColor}
           onUndoRequest={undoTrigger}
           onClearRequest={clearTrigger}
           onDirty={() => setIsDirty(true)}
@@ -424,6 +426,8 @@ export default function ReadingTab({ book }) {
             onUndo={() => setUndoTrigger((prev) => prev + 1)}
             onClear={() => setClearTrigger((prev) => prev + 1)}
             onCancel={() => setActiveTool(null)}
+            activeColor={activeColor}
+            onSelectColor={setActiveColor}
           />
         )}
 

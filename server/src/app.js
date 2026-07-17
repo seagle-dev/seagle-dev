@@ -4,6 +4,7 @@ const path = require('path');
 require('dotenv').config({ override: true });
 
 const app = express();
+app.set('trust proxy', true);
 
 // CORS configuration
 // Allow WebView/pdf.js requests too; embedded HTML often sends a null/opaque origin.

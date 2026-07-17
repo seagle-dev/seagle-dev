@@ -35,19 +35,19 @@ function ensurePdfJsPolyfills() {
   disableBrowserImageApi('OffscreenCanvas');
   disableBrowserImageApi('ImageDecoder');
 
-  if (typeof globalThis.DOMMatrix === 'undefined' && DOMMatrix) {
+  if (DOMMatrix) {
     globalThis.DOMMatrix = DOMMatrix;
   }
 
-  if (typeof globalThis.ImageData === 'undefined' && ImageData) {
+  if (ImageData) {
     globalThis.ImageData = ImageData;
   }
 
-  if (typeof globalThis.Image === 'undefined' && Image) {
+  if (Image) {
     globalThis.Image = Image;
   }
 
-  if (typeof globalThis.Path2D === 'undefined' && Path2D) {
+  if (Path2D) {
     globalThis.Path2D = Path2D;
   }
 }
