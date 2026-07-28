@@ -22,8 +22,13 @@ export default function Index() {
   React.useEffect(() => {
     (async () => {
       try {
-        const stored = await AsyncStorage.getItem('user');
-        setHasUser(!!stored);
+        const staySigned = await AsyncStorage.getItem('staySigned');
+        if (staySigned === 'true') {
+          const stored = await AsyncStorage.getItem('user');
+          setHasUser(!!stored);
+        } else {
+          setHasUser(false);
+        }
       } catch (e) {
         console.error("Auth check error", e);
       } finally {

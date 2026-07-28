@@ -278,6 +278,80 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
       color: #ccc;
       font-size: 12px;
     }
+
+    /* Custom Prompt Modal */
+    .custom-prompt-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .custom-prompt-overlay.visible {
+      opacity: 1;
+    }
+    .custom-prompt-modal {
+      background: #FCF4DD;
+      border: 1px solid #EADBB6;
+      border-radius: 12px;
+      padding: 20px;
+      width: 300px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      font-family: -apple-system, sans-serif;
+      transform: scale(0.95);
+      transition: transform 0.2s;
+    }
+    .custom-prompt-overlay.visible .custom-prompt-modal {
+      transform: scale(1);
+    }
+    .custom-prompt-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #111A50;
+      margin-bottom: 12px;
+      margin-top: 0;
+    }
+    .custom-prompt-input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border: 1px solid #d5c8a4;
+      border-radius: 6px;
+      font-size: 14px;
+      background: #fff;
+      color: #333;
+      margin-bottom: 16px;
+      outline: none;
+    }
+    .custom-prompt-input:focus {
+      border-color: #f7944d;
+      box-shadow: 0 0 0 2px rgba(247, 148, 77, 0.2);
+    }
+    .custom-prompt-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .custom-prompt-btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+    }
+    .custom-prompt-btn.cancel {
+      background: transparent;
+      color: #666;
+    }
+    .custom-prompt-btn.save {
+      background: #111A50;
+      color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -893,6 +967,66 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
     let redoStack = [];
     const pageDrawings = new Map(); // pageNum -> { items: [] }
 
+    function showCustomPrompt(message) {
+      return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'custom-prompt-overlay';
+        
+        const modal = document.createElement('div');
+        modal.className = 'custom-prompt-modal';
+        
+        const title = document.createElement('h3');
+        title.className = 'custom-prompt-title';
+        title.textContent = message;
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'custom-prompt-input';
+        
+        const buttons = document.createElement('div');
+        buttons.className = 'custom-prompt-buttons';
+        
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'custom-prompt-btn cancel';
+        cancelBtn.textContent = 'Cancel';
+        
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'custom-prompt-btn save';
+        saveBtn.textContent = 'Save';
+        
+        buttons.appendChild(cancelBtn);
+        buttons.appendChild(saveBtn);
+        
+        modal.appendChild(title);
+        modal.appendChild(input);
+        modal.appendChild(buttons);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        requestAnimationFrame(() => {
+          overlay.classList.add('visible');
+          input.focus();
+        });
+        
+        const close = (value) => {
+          overlay.classList.remove('visible');
+          setTimeout(() => {
+            if (overlay.parentNode) {
+              overlay.parentNode.removeChild(overlay);
+            }
+            resolve(value);
+          }, 200);
+        };
+        
+        cancelBtn.onclick = () => close(null);
+        saveBtn.onclick = () => close(input.value);
+        input.onkeydown = (e) => {
+          if (e.key === 'Enter') close(input.value);
+          if (e.key === 'Escape') close(null);
+        };
+      });
+    }
+
     function getDrawingCanvas(pageNum) {
       const container = document.getElementById('page-' + pageNum);
       if (!container) return null;
@@ -960,7 +1094,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
     }
 
     function getTextFont(size = 16) {
-      return 'bold ' + size + 'px -apple-system, sans-serif';
+      return 'italic 500 ' + size + 'px "STIX Two Text", Georgia, serif';
     }
 
     function setupDrawingListeners(canvas, pageNum) {
@@ -1125,7 +1259,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         currentPath = [];
       };
 
-      const click = (e) => {
+      const click = async (e) => {
         if (activeTool !== 'text') return;
         if (suppressNextTextClick) {
           suppressNextTextClick = false;
@@ -1135,7 +1269,7 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
         const pos = getPos(e);
         if (findTextAt(pos)) return;
 
-        const text = prompt('Enter annotation text:');
+        const text = await showCustomPrompt('Add academic note / research marginalia:');
         if (text && text.trim()) {
           saveDrawing(pageNum, {
             type: 'text',
@@ -1197,10 +1331,58 @@ export default function getPdfViewerHtml(pdfUrl, authToken) {
           });
           ctx.stroke();
         } else if (item.type === 'text') {
+          ctx.save();
           ctx.globalCompositeOperation = 'source-over';
-          ctx.fillStyle = item.color || '#F5F5F5';
-          ctx.font = getTextFont(getTextSize(item));
-          ctx.fillText(item.text, item.x * canvas.width, item.y * canvas.height);
+          
+          const size = getTextSize(item);
+          ctx.font = getTextFont(size);
+          const textWidth = ctx.measureText(item.text).width;
+          const textHeight = size;
+          
+          const paddingX = 10;
+          const paddingY = 6;
+          const radius = 6;
+          
+          const rectX = item.x * canvas.width - paddingX;
+          const rectY = item.y * canvas.height - textHeight - paddingY + 2;
+          const rectWidth = textWidth + paddingX * 2;
+          const rectHeight = textHeight + paddingY * 2;
+          
+          // Draw elegant capsule/card background (warm ivory/cream paper color)
+          ctx.fillStyle = '#FCF4DD';
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.12)';
+          ctx.shadowBlur = 4;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 2;
+          
+          ctx.beginPath();
+          ctx.moveTo(rectX + radius, rectY);
+          ctx.lineTo(rectX + rectWidth - radius, rectY);
+          ctx.quadraticCurveTo(rectX + rectWidth, rectY, rectX + rectWidth, rectY + radius);
+          ctx.lineTo(rectX + rectWidth, rectY + rectHeight - radius);
+          ctx.quadraticCurveTo(rectX + rectWidth, rectY + rectHeight, rectX + rectWidth - radius, rectY + rectHeight);
+          ctx.lineTo(rectX + radius, rectY + rectHeight);
+          ctx.quadraticCurveTo(rectX, rectY + rectHeight, rectX, rectY + rectHeight - radius);
+          ctx.lineTo(rectX, rectY + radius);
+          ctx.quadraticCurveTo(rectX, rectY, rectX + radius, rectY);
+          ctx.closePath();
+          ctx.fill();
+          
+          // Outer subtle academic border
+          ctx.strokeStyle = '#EADBB6';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          
+          // Reset shadow
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          
+          // Draw text centered within padding
+          ctx.fillStyle = item.color && item.color !== '#F5F5F5' ? item.color : '#111A50';
+          ctx.fillText(item.text, item.x * canvas.width, item.y * canvas.height - 2);
+          ctx.restore();
         }
       });
     }
