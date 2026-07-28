@@ -17,6 +17,9 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme'
+import ConfirmationModal from '../components/ConfirmationModal'
+import { Ionicons } from '@expo/vector-icons'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 const SHOW_GOOGLE_SIGN_IN = false
 
@@ -27,20 +30,43 @@ export default function Auth() {
   const [password, setPassword] = React.useState('')
   const [staySigned, setStaySigned] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(false)
+  const [secureText, setSecureText] = React.useState(true)
+  const [errorModal, setErrorModal] = React.useState({ visible: false, title: '', message: '' })
 
   const handleSignIn = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password')
+      setErrorModal({
+        visible: true,
+        title: 'Error',
+        message: 'Please enter email and password'
+      })
       return
     }
 
     setIsLoading(true)
     try {
       const data = await login(email, password)
+      await AsyncStorage.setItem('staySigned', staySigned ? 'true' : 'false')
       await signIn(data.user, data.token)
       router.replace('/tabs/library')
     } catch (err) {
-      Alert.alert('Login Failed', err.message || 'Invalid credentials')
+      const isAuthError = err.response?.status === 401 || err.response?.status === 404;
+      const backendMessage = err.response?.data?.error || err.response?.data?.message;
+
+      let finalMessage = 'An unexpected error occurred. Please try again.';
+      if (isAuthError) {
+        finalMessage = 'Wrong email or password.';
+      } else if (backendMessage) {
+        finalMessage = backendMessage;
+      } else if (err.message && !err.message.includes('401')) {
+        finalMessage = err.message;
+      }
+
+      setErrorModal({
+        visible: true,
+        title: 'Login Failed',
+        message: finalMessage
+      })
     } finally {
       setIsLoading(false)
     }
@@ -76,15 +102,28 @@ export default function Auth() {
 
         <View style={styles.field}>
           <Text style={styles.label}>Password:</Text>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="*********"
-            placeholderTextColor="#999999ce"
-            secureTextEntry
-            style={[styles.input, { color: COLORS.textPrimary }]}
-            editable={!isLoading}
-          />
+          <View style={styles.passwordContainer}>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="*********"
+              placeholderTextColor="#999999ce"
+              secureTextEntry={secureText}
+              style={[styles.passwordInput, { color: COLORS.textPrimary }]}
+              editable={!isLoading}
+            />
+            <TouchableOpacity
+              style={styles.eyeButton}
+              onPress={() => setSecureText(!secureText)}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={secureText ? 'eye-off' : 'eye'}
+                size={20}
+                color={COLORS.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.row}>
@@ -126,16 +165,16 @@ export default function Auth() {
 
         {SHOW_GOOGLE_SIGN_IN && (
           <>
-        <View style={styles.dividerRow}>
-          <View style={styles.divider} />
-          <Text style={styles.dividerText}>OR</Text>
-          <View style={styles.divider} />
-        </View>
+            <View style={styles.dividerRow}>
+              <View style={styles.divider} />
+              <Text style={styles.dividerText}>OR</Text>
+              <View style={styles.divider} />
+            </View>
 
-        <TouchableOpacity style={styles.googleButton}>
-          <Image source={require('../../assets/google.png')} style={styles.googleIcon} />
-          <Text style={styles.googleText}>Google</Text>
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.googleButton}>
+              <Image source={require('../../assets/google.png')} style={styles.googleIcon} />
+              <Text style={styles.googleText}>Google</Text>
+            </TouchableOpacity>
           </>
         )}
 
@@ -144,7 +183,7 @@ export default function Auth() {
           <Text style={styles.link}>Terms of Use</Text> and <Text style={styles.link}>Privacy Policy</Text>.
         </Text>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.adminLink}
           onPress={() => {
             const adminUrl = Platform.OS === 'android' ? 'http://10.0.2.2:5173/admin' : 'http://localhost:5173/admin';
@@ -158,11 +197,19 @@ export default function Auth() {
           <Text style={styles.adminText}>Sign in as Admin</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <ConfirmationModal
+        visible={errorModal.visible}
+        title={errorModal.title}
+        message={errorModal.message}
+        confirmLabel="OK"
+        onConfirm={() => setErrorModal({ visible: false, title: '', message: '' })}
+        type="error"
+      />
     </KeyboardAvoidingView>
   )
 }
 
-// ...existing code... (keep all the existing styles exactly as they are)
 const styles = StyleSheet.create({
   container: {
     padding: SPACING.xxl,
@@ -198,6 +245,25 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.bgWhite,
     fontSize: FONT_SIZES.lg,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.bgWhite,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    fontSize: FONT_SIZES.lg,
+  },
+  eyeButton: {
+    paddingHorizontal: SPACING.md,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   row: {
     marginTop: SPACING.sm,

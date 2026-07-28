@@ -11,8 +11,15 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     (async () => {
       try {
-        const stored = await AsyncStorage.getItem('user')
-        if (stored) setUser(JSON.parse(stored))
+        const staySigned = await AsyncStorage.getItem('staySigned')
+        if (staySigned === 'true') {
+          const stored = await AsyncStorage.getItem('user')
+          if (stored) setUser(JSON.parse(stored))
+        } else {
+          // If staySigned is false/not set, clear storage
+          await AsyncStorage.multiRemove(['token', 'user', 'staySigned'])
+          setUser(null)
+        }
       } catch (e) {
         console.warn('Failed to restore user:', e)
       } finally {
