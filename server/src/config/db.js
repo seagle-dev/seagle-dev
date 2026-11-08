@@ -1,59 +1,31 @@
-const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
 
-let pool;
+const connectionString = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
 
-if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('mysql:')) {
-  pool = mysql.createPool(process.env.DATABASE_URL);
-} else {
-  const config = {
-    host: process.env.MYSQL_HOST || 'localhost',
-    user: process.env.MYSQL_USER || 'root',
-    password: process.env.MYSQL_PASSWORD,
-    database: process.env.MYSQL_DATABASE || 'railway',
-    port: parseInt(process.env.MYSQL_PORT || '3306', 10),
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-  };
-  pool = mysql.createPool(config);
+if (!connectionString) {
+  throw new Error('Missing SUPABASE_DB_URL. Set it to your Supabase Postgres connection string.');
 }
 
-console.log('MySQL pool initialized.');
+if (!/^postgres(?:ql)?:\/\//i.test(connectionString)) {
+  throw new Error('SUPABASE_DB_URL must be a PostgreSQL connection string.');
+}
 
-// Custom query wrapper to translate PG queries to MySQL
-const db = {
-  async query(sql, params) {
-    // 1. Convert PostgreSQL parameters $1, $2 to MySQL ?
-    let convertedSql = sql.replace(/\$\d+/g, '?');
+const pool = new Pool({
+  connectionString,
+  // Supabase requires TLS for hosted database connections.
+  ssl: { rejectUnauthorized: false },
+  max: Number.parseInt(process.env.DB_POOL_MAX || '10', 10),
+  connectionTimeoutMillis: 10_000,
+  idleTimeoutMillis: 30_000,
+});
 
-    // 2. Handle PostgreSQL RETURNING id clause
-    let isReturningId = false;
-    if (/RETURNING\s+id/i.test(convertedSql)) {
-      isReturningId = true;
-      convertedSql = convertedSql.replace(/RETURNING\s+id/i, '');
-    }
+pool.on('error', (error) => {
+  console.error('Unexpected Supabase Postgres pool error:', error.message);
+});
 
-    // 3. Execute query
-    const [result] = await pool.query(convertedSql, params);
+console.log('Supabase Postgres pool initialized.');
 
-    // 4. Return compatible PG structure { rows }
-    let rows;
-    if (isReturningId && result && typeof result.insertId === 'number') {
-      rows = [{ id: result.insertId }];
-    } else {
-      rows = Array.isArray(result) ? result : [];
-    }
-
-    // Form compatible structure for both:
-    // - const { rows } = await db.query(...)
-    // - const [rows] = await db.query(...)
-    const response = [rows, null];
-    response.rows = rows;
-    
-    return response;
-  },
-  
-  pool
+module.exports = {
+  query: (sql, params) => pool.query(sql, params),
+  pool,
 };
-
-module.exports = db;

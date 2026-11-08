@@ -1,93 +1,70 @@
+jest.mock('../config/firebase', () => {
+  const bucket = { file: jest.fn() };
+  return { storage: () => ({ bucket: () => bucket }) };
+});
+
+const admin = require('../config/firebase');
 const storageService = require('./storage.service');
-const db = require('../config/db');
-const crypto = require('crypto');
+const bucket = admin.storage().bucket();
 
-jest.mock('../config/db', () => ({
-  query: jest.fn()
-}));
-
-jest.mock('crypto', () => ({
-  randomUUID: jest.fn(() => 'test-uuid-1234')
-}));
+jest.mock('crypto', () => ({ randomUUID: jest.fn(() => 'test-uuid-1234') }));
 
 describe('storage.service', () => {
+  let file;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    file = {
+      save: jest.fn().mockResolvedValue(undefined),
+      download: jest.fn(),
+      getMetadata: jest.fn(),
+      exists: jest.fn(),
+      createReadStream: jest.fn(),
+      delete: jest.fn().mockResolvedValue(undefined),
+    };
+    bucket.file.mockReturnValue(file);
   });
 
-  describe('uploadBuffer', () => {
-    it('should insert buffer into file_storage table', async () => {
-      db.query.mockResolvedValue([{ insertId: 1 }]);
-      
-      const buffer = Buffer.from('test data');
-      const destPath = 'test/path.pdf';
-      const contentType = 'application/pdf';
-
-      const result = await storageService.uploadBuffer(buffer, destPath, contentType);
-
-      expect(db.query).toHaveBeenCalledTimes(1);
-      expect(db.query.mock.calls[0][0]).toContain('INSERT INTO file_storage');
-      expect(db.query.mock.calls[0][1]).toEqual([destPath, contentType, buffer]);
-      expect(result).toBe(destPath);
-    });
-
-    it('should throw an error if db query fails', async () => {
-      db.query.mockRejectedValue(new Error('DB Error'));
-      
-      await expect(
-        storageService.uploadBuffer(Buffer.from('test'), 'path', 'type')
-      ).rejects.toThrow('DB Error');
+  it('uploads buffers with their content type', async () => {
+    const buffer = Buffer.from('test');
+    await expect(storageService.uploadBuffer(buffer, 'books/a.pdf', 'application/pdf'))
+      .resolves.toBe('books/a.pdf');
+    expect(bucket.file).toHaveBeenCalledWith('books/a.pdf');
+    expect(file.save).toHaveBeenCalledWith(buffer, {
+      resumable: false,
+      metadata: { contentType: 'application/pdf' },
     });
   });
 
-  describe('uploadFile', () => {
-    it('should extract extension and generate uuid filename', async () => {
-      db.query.mockResolvedValue([{}]);
-      
-      const file = {
-        originalname: 'my_doc.PDF',
-        buffer: Buffer.from('test'),
-        mimetype: 'application/pdf'
-      };
+  it('creates a UUID object name for uploaded files', async () => {
+    await storageService.uploadFile({
+      originalname: 'my_doc.PDF', buffer: Buffer.from('test'), mimetype: 'application/pdf',
+    }, 'books');
+    expect(bucket.file).toHaveBeenCalledWith('books/test-uuid-1234.pdf');
+  });
 
-      const result = await storageService.uploadFile(file, 'books');
+  it('downloads an object buffer and returns null for a missing object', async () => {
+    const buffer = Buffer.from('stored');
+    file.download.mockResolvedValue([buffer]);
+    await expect(storageService.getFileBuffer('books/a.pdf')).resolves.toBe(buffer);
+    file.download.mockRejectedValue({ code: 404 });
+    await expect(storageService.getFileBuffer('missing.pdf')).resolves.toBeNull();
+  });
 
-      expect(result).toBe('books/test-uuid-1234.pdf');
-      expect(db.query).toHaveBeenCalledTimes(1);
+  it('returns a readable stream and object metadata', async () => {
+    const stream = {};
+    file.getMetadata.mockResolvedValue([{ contentType: 'image/png', size: '42' }]);
+    file.exists.mockResolvedValue([true]);
+    file.createReadStream.mockReturnValue(stream);
+    await expect(storageService.getFileStream('covers/a.png')).resolves.toEqual({
+      stream, contentType: 'image/png', size: 42,
     });
   });
 
-  describe('getFileBuffer', () => {
-    it('should return null if filePath is missing', async () => {
-      const result = await storageService.getFileBuffer(null);
-      expect(result).toBeNull();
-    });
-
-    it('should return buffer if found in db', async () => {
-      const mockBuffer = Buffer.from('db data');
-      db.query.mockResolvedValue({ rows: [{ file_data: mockBuffer }] });
-
-      const result = await storageService.getFileBuffer('test/path.pdf');
-
-      expect(db.query).toHaveBeenCalledWith('SELECT file_data FROM file_storage WHERE file_path = $1', ['test/path.pdf']);
-      expect(result).toBe(mockBuffer);
-    });
-
-    it('should return null if not found in db', async () => {
-      db.query.mockResolvedValue({ rows: [] });
-
-      const result = await storageService.getFileBuffer('test/path.pdf');
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('deleteFileByPath', () => {
-    it('should execute delete query', async () => {
-      db.query.mockResolvedValue([{}]);
-      
-      await storageService.deleteFileByPath('test/path.pdf');
-      
-      expect(db.query).toHaveBeenCalledWith('DELETE FROM file_storage WHERE file_path = $1', ['test/path.pdf']);
-    });
+  it('deletes an object and ignores an empty path', async () => {
+    await storageService.deleteFileByPath('books/a.pdf');
+    expect(file.delete).toHaveBeenCalledWith({ ignoreNotFound: true });
+    await storageService.deleteFileByPath(null);
+    expect(bucket.file).toHaveBeenCalledTimes(1);
   });
 });

@@ -17,15 +17,15 @@ function sendControllerError(res, err, fallbackMessage = 'Server error') {
 }
 
 /**
- * Generic helper: stream a GCS file through Express.
+ * Generic helper: stream a Supabase Storage file through Express.
  * Sets proper Content-Type, Content-Length, caching, and CORS headers.
  */
-async function streamGcsFile(gcsPath, res, fallbackContentType) {
-  if (!gcsPath) {
+async function streamStorageFile(filePath, res, fallbackContentType) {
+  if (!filePath) {
     return res.status(404).json({ message: 'File not found' });
   }
 
-  const result = await getFileStream(gcsPath);
+  const result = await getFileStream(filePath);
   if (!result) {
     return res.status(404).json({ message: 'File not found in storage' });
   }
@@ -75,7 +75,7 @@ async function getBookPdf(req, res) {
     const id = requirePositiveInt(req.params.id, 'Invalid book id');
 
     const pdfPath = await adminService.getBookPdfPath(id);
-    await streamGcsFile(pdfPath, res, 'application/pdf');
+    await streamStorageFile(pdfPath, res, 'application/pdf');
   } catch (err) {
     console.error('getBookPdf error', err);
     sendControllerError(res, err);
@@ -87,7 +87,7 @@ async function getBookCover(req, res) {
     const id = requirePositiveInt(req.params.id, 'Invalid book id');
 
     const coverPath = await adminService.getBookCoverPath(id);
-    await streamGcsFile(coverPath, res, 'image/png');
+    await streamStorageFile(coverPath, res, 'image/png');
   } catch (err) {
     console.error('getBookCover error', err);
     sendControllerError(res, err);
@@ -154,7 +154,7 @@ async function getModelFile(req, res) {
       'gltf': 'model/gltf+json',
     };
 
-    await streamGcsFile(filePath, res, contentTypeMap[ext] || 'application/octet-stream');
+    await streamStorageFile(filePath, res, contentTypeMap[ext] || 'application/octet-stream');
   } catch (err) {
     console.error('getModelFile error', err);
     sendControllerError(res, err);
@@ -166,7 +166,7 @@ async function getModelThumbnail(req, res) {
     const id = requirePositiveInt(req.params.id, 'Invalid model id');
 
     const thumbPath = await adminService.getModelThumbnailPath(id);
-    await streamGcsFile(thumbPath, res, 'image/png');
+    await streamStorageFile(thumbPath, res, 'image/png');
   } catch (err) {
     console.error('getModelThumbnail error', err);
     sendControllerError(res, err);

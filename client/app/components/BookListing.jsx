@@ -8,10 +8,11 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, FONT_SIZES, SPACING, RADIUS } from '../../constants/theme';
+import { useAuth } from '../context/AuthContext';
 import LoadingView from './LoadingView';
 import { fetchHome, getBookCoverUrl } from '../../services/api';
-import { Ionicons } from '@expo/vector-icons';
 import { PLACEHOLDER_BOOK_COVER } from '../../constants/placeholders';
 
 const mapRecentBook = (b) => ({
@@ -39,11 +40,14 @@ const mapTrendingBook = (b) => ({
 
 export default function BookListing() {
   const router = useRouter();
+  const { loading: authLoading } = useAuth();
   const [recentBooks, setRecentBooks] = useState([]);
   const [trendingBooks, setTrendingBooks] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
+
     (async () => {
       try {
         const data = await fetchHome();
@@ -57,7 +61,7 @@ export default function BookListing() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [authLoading]);
 
   const handleBookPress = useCallback((book) => {
     const normalizedBook = {
@@ -77,11 +81,10 @@ export default function BookListing() {
     });
   }, [router]);
 
-  if (loading) return <LoadingView message="" color={COLORS.navy} backgroundColor={COLORS.bgPrimary} />;
+  if (authLoading || loading) return <LoadingView message="" color={COLORS.navy} backgroundColor={COLORS.bgPrimary} />;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-      {/* Recent Section */}
       <SectionHeader title="Recent" />
       <View style={styles.section}>
         {recentBooks.length === 0 ? (
@@ -115,7 +118,6 @@ export default function BookListing() {
         )}
       </View>
 
-      {/* Trending Section */}
       <SectionHeader title="Trending" />
       <View style={styles.section}>
         {trendingBooks.length === 0 ? (
@@ -144,7 +146,6 @@ export default function BookListing() {
   );
 }
 
-/** Inline sub-component for section header with "See All" */
 function SectionHeader({ title }) {
   return (
     <View style={styles.sectionContainer}>
@@ -169,7 +170,6 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: FONT_SIZES.title, fontWeight: '800', color: COLORS.textPrimary, letterSpacing: -0.5, fontFamily: FONTS.serifBold },
   seeAllText: { fontSize: FONT_SIZES.body, fontWeight: '600', color: COLORS.navy, fontFamily: FONTS.light },
 
-  // Recent card
   recentCard: { backgroundColor: COLORS.bgWhite, marginHorizontal: SPACING.sm, marginBottom: SPACING.md, borderRadius: RADIUS.xl },
   recentCardContent: { flexDirection: 'row', padding: SPACING.lg, alignItems: 'center', gap: SPACING.md },
   bookCoverBg: { width: 110, height: 180, borderRadius: 3, overflow: 'hidden' },
@@ -186,7 +186,6 @@ const styles = StyleSheet.create({
   chapterContainer: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   chapterText: { fontSize: FONT_SIZES.md, color: COLORS.textTertiary, fontFamily: FONTS.light },
 
-  // Trending card
   trendingCard: { backgroundColor: COLORS.bgWhite, marginHorizontal: SPACING.sm, marginBottom: SPACING.md, borderRadius: RADIUS.xl, overflow: 'visible' },
   trendingCardContent: { flexDirection: 'row', padding: SPACING.lg, paddingBottom: SPACING.md },
   trendingCover: { width: 100, height: 150, borderRadius: SPACING.md, marginRight: SPACING.lg, borderWidth: 1, borderColor: COLORS.navy },

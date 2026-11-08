@@ -45,7 +45,7 @@ async function getBookCoverPath(id) {
 
 /**
  * Detect images on a specific page of a book's PDF.
- * Downloads the PDF from GCS, then runs pdfDetection on the buffer.
+ * Downloads the PDF from Supabase Storage, then runs pdfDetection on the buffer.
  */
 async function detectImagesOnPage(bookId, pageNumber) {
   const pdfPath = await getBookPdfPath(bookId);
@@ -59,11 +59,11 @@ async function detectImagesOnPage(bookId, pageNumber) {
 
 
 /**
- * Upload a book PDF to Firebase Storage, auto-generate cover from page 1,
- * and insert record into DB. Stores GCS paths (not URLs).
+ * Upload a book PDF to Supabase Storage, auto-generate cover from page 1,
+ * and insert record into DB. Stores object paths (not URLs).
  */
 async function createBook({ title, description, category, pdfFile, uploadedBy }) {
-  // 1. Upload PDF to Firebase Storage -> books/pdf/
+  // 1. Upload PDF to Supabase Storage -> books/pdf/
   const pdfPath = await uploadFile(pdfFile, 'books/pdf');
   console.log('[createBook] ✅ Step 1 DONE - PDF uploaded:', pdfPath);
 
@@ -138,8 +138,8 @@ async function listModels() {
     return rows.map(model => ({
       id: model.id,
       name: model.name,
-      file_url: model.file_url,       // GCS path
-      thumbnail: model.thumbnail,       // GCS path
+      file_url: model.file_url,       // Supabase Storage object path
+      thumbnail: model.thumbnail,       // Supabase Storage object path
       view_state: normalizeViewState(model.view_state),
       category: model.category,
       created_at: model.created_at,
@@ -175,12 +175,12 @@ async function getModelThumbnailPath(id) {
 }
 
 /**
- * Upload a 3D model (GLB/GLTF) to Firebase Storage and insert into DB.
- * Stores GCS path (not URL).
+ * Upload a 3D model (GLB/GLTF) to Supabase Storage and insert into DB.
+ * Stores the object path (not URL).
  */
 async function createModel({ name, category, modelFile, uploadedBy }) {
   const filePath = await uploadFile(modelFile, 'models/files');
-  console.log('3D model uploaded to GCS path:', filePath);
+  console.log('3D model uploaded to Supabase Storage path:', filePath);
 
   const sql = `INSERT INTO models_3d (name, file_url, thumbnail, category, uploaded_by) VALUES ($1, $2, $3, $4, $5) RETURNING id`;
   const params = [

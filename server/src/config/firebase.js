@@ -30,13 +30,10 @@ const serviceAccount = {
   client_x509_cert_url: FIREBASE_CLIENT_X509_CERT_URL
 };
 
-const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || FIREBASE_PROJECT_ID;
-
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  storageBucket: storageBucket
+  credential: admin.credential.cert(serviceAccount)
 });
 
-console.log('Firebase Admin initialized with storage bucket:', storageBucket);
+console.log('Firebase Admin initialized for authentication.');
 
 module.exports = admin;
