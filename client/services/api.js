@@ -1,39 +1,14 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
-import Constants from 'expo-constants';
 
-const API_PORT = process.env.EXPO_PUBLIC_API_PORT || '5000';
-const API_PATH = '/api';
-
-function getExpoHost() {
-  const hostUri =
-    Constants.expoConfig?.hostUri ||
-    Constants.manifest2?.extra?.expoClient?.hostUri ||
-    Constants.manifest?.debuggerHost;
-
-  if (!hostUri) return null;
-
-  return hostUri
-    .replace(/^https?:\/\//, '')
-    .replace(/^exp:\/\//, '')
-    .split('/')[0]
-    .split(':')[0];
-}
+const DEPLOYED_API_BASE_URL = 'http://192.168.254.193:5000/api';
 
 function getApiBaseUrl() {
   if (process.env.EXPO_PUBLIC_API_BASE_URL) {
     return process.env.EXPO_PUBLIC_API_BASE_URL.replace(/\/$/, '');
   }
 
-  const expoHost = getExpoHost();
-  if (expoHost && expoHost !== 'localhost' && expoHost !== '127.0.0.1') {
-    return `http://${expoHost}:${API_PORT}${API_PATH}`;
-  }
-
-  // Android emulator uses 10.0.2.2 to reach the host machine's localhost.
-  const fallbackHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-  return `http://${fallbackHost}:${API_PORT}${API_PATH}`;
+  return DEPLOYED_API_BASE_URL;
 }
 
 const DEFAULT_BASE = getApiBaseUrl();

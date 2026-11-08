@@ -5,7 +5,7 @@ const { verifyToken } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 const adminController = require('../controllers/admin.controller');
 
-// Multer with memory storage — files go to buffer, then to Firebase
+// Multer memory storage keeps files in a buffer before upload to Supabase Storage.
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB max

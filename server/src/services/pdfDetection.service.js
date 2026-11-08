@@ -39,7 +39,7 @@ function findTitleForLineIndex(lines, idx) {
 
 /**
  * Detect images on a single page of a PDF.
- * Now accepts a Buffer instead of a file path (for GCS compatibility).
+ * Accepts a Buffer so it can process files from Supabase Storage.
  * @param {Buffer} pdfBuffer - The PDF file content as a buffer
  * @param {number} pageNum - Page number (1-based)
  * @returns {Promise<object>} Detection results with normalized coordinates
